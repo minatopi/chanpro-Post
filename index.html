@@ -7,7 +7,7 @@
 <title>chanpro-Post</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <style>
 *{box-sizing:border-box}
 
@@ -564,40 +564,17 @@ button{
     </div>
 
     <div class="nav">
-
-      <button onclick="showPage('home')">
-        🏠 ホーム
-      </button>
-
-      <button onclick="showPage('search')">
-        🔍 検索
-      </button>
-
-      <button onclick="showPage('notifications')">
-        🔔 通知
-      </button>
-
-      <button onclick="showPage('messages')">
-        ✉️ DM
-      </button>
-
-      <button onclick="showMyProfile()">
-        👤 プロフィール
-      </button>
-
-      <button onclick="showBookmarks()">
-        🔖 ブックマーク
-      </button>
-
-      <button
-        id="adminNav"
-        class="hidden"
-        onclick="showPage('admin')"
-      >
-        🛠 管理
-      </button>
-
+      <button onclick='showPage("home")'>🏠 ホーム</button>
+      <button onclick='showPage("search")'>🔍 検索</button>
+      <button onclick='showPage("notifications")'>🔔 通知</button>
+      <button onclick='showFollowingLatestPosts()'>👥 フォロー中</button>
+      <button onclick='showPage("messages")'>✉️ DM</button>
+      <button onclick='showMyProfile()'>👤 プロフィール</button>
+      <button onclick='showBookmarks()'>🔖 ブックマーク</button>
+      <button id="adminNav" class="hidden" onclick='showPage("admin")'>🛠 管理</button>
     </div>
+
+
 
     <button
       class="postButton"
@@ -667,12 +644,7 @@ button{
 
       <div style="padding:15px">
 
-        <input
-          id="searchInput"
-          class="search"
-          placeholder="ユーザー・投稿・#ハッシュタグ"
-          onkeydown="if(event.key==='Enter')searchAll()"
-        >
+        <input id="searchInput" class="search" placeholder="ユーザー・投稿・#ハッシュタグ" onkeydown="if(event.key==='Enter')searchAll(this.value)">
 
       </div>
 
@@ -682,13 +654,8 @@ button{
 
 
     <div id="notificationPage" class="hidden">
-
-      <div class="pageHeader">
-        通知
-      </div>
-
+      <div class="pageHeader">通知</div>
       <div id="notifications"></div>
-
     </div>
 
 
@@ -732,17 +699,6 @@ button{
 
   <aside class="rightbar">
 
-    <input
-      class="search"
-      placeholder="検索"
-      onkeydown="
-        if(event.key==='Enter'){
-          document.getElementById('searchInput').value=this.value;
-          searchAll();
-        }
-      "
-    >
-
     <div class="card">
 
       <h3>
@@ -780,215 +736,284 @@ button{
 
 
 <script>
+/* =========================================================
+   chanpro-Post
+   Supabase アクセス大幅削減版
+   ========================================================= */
 
 const SUPABASE_URL =
-"https://ldnmqfmebvyzlmhgnljf.supabase.co";
+  "https://ldnmqfmebvyzlmhgnljf.supabase.co";
 
 const SUPABASE_ANON_KEY =
-"sb_publishable_sJCCy8PpxucgNgweKh9jsA_BKne3v3U";
+  "sb_publishable_sJCCy8PpxucgNgweKh9jsA_BKne3v3U";
 
-const supabaseClient =
-supabase.createClient(
+const supabaseClient = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
 
+/* =========================================================
+   State
+   ========================================================= */
+
 let currentUser = null;
 let currentDMUser = null;
+let dmChannel = null;
+let mqttClient = null;
+
+const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+
+const cache = {
+  users: new Map(),
+  posts: new Map(),
+  follows: null,
+  trends: null,
+  suggestedUsers: null
+};
 
 
-/* =========================
-   共通
-========================= */
+/* =========================================================
+   Basic helpers
+   ========================================================= */
 
-function $(id){
+function $(id) {
   return document.getElementById(id);
 }
 
-function escapeHTML(value){
-
+function escapeHTML(value) {
   return String(value ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#039;");
-
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
-
-function avatarURL(url,size=100){
-
+function avatarURL(url, size = 100) {
   return url ||
     `https://placehold.jp/${size}x${size}.png`;
-
 }
 
-
-function toast(message){
-
+function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.remove("hidden");
 
-  setTimeout(()=>{
-    $("toast").classList.add("hidden");
-  },2500);
+  clearTimeout(window.__toastTimer);
 
+  window.__toastTimer = setTimeout(() => {
+    $("toast").classList.add("hidden");
+  }, 2500);
 }
 
-
-function openModal(html){
-
+function openModal(html) {
   $("modalContent").innerHTML = html;
   $("modal").classList.remove("hidden");
-
 }
 
-
-function closeModal(){
-
+function closeModal() {
   $("modal").classList.add("hidden");
-
 }
 
-
-/* =========================
-   sandbox対応ストレージ
-========================= */
-
-
-function safeGet(key){
-
-  try{
+function safeGet(key) {
+  try {
     return localStorage.getItem(key);
-  }catch(e){
-
+  } catch {
     return null;
-
   }
-
 }
 
-
-
-
-function safeSet(key,value){
-
-  try{
-
-    localStorage.setItem(
-      key,
-      value
-    );
-
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
     return true;
-
-  }catch(e){
-
+  } catch {
     return false;
-
   }
-
 }
 
-
-
-function safeRemove(key){
-
-  try{
+function safeRemove(key) {
+  try {
     localStorage.removeItem(key);
-  }catch(e){}
+  } catch {}
+}
+
+function formatDate(date) {
+  const d = new Date(date);
+
+  return d.toLocaleString("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 
-/* =========================
-   パスワード
-========================= */
+/* =========================================================
+   Password
+   ========================================================= */
 
-async function hashPassword(password){
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password);
 
-  const data =
-    new TextEncoder().encode(password);
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    data
+  );
 
-  const hash =
-    await crypto.subtle.digest(
-      "SHA-256",
-      data
-    );
-
-  return Array.from(
-    new Uint8Array(hash)
-  )
-  .map(x =>
-    x.toString(16).padStart(2,"0")
-  )
-  .join("");
-
+  return Array.from(new Uint8Array(hash))
+    .map(x => x.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 
-/* =========================
-   アカウント
-========================= */
+/* =========================================================
+   User cache
+   ========================================================= */
 
-async function login(){
 
-  const username =
-    $("loginName").value.trim();
+async function getUser(id) {
+  if (!id) return null;
 
-  const password =
-    $("loginPassword").value;
+  // キャッシュにある古いユーザー情報を使わない
+  cache.users.delete(id);
 
-  if(!username || !password){
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("users")
+    .select(`
+      id,
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      role,
+      ban_until,
+      program_urls,
+      program_views,
+      program_likes
+    `)
+    .eq("id", id)
+    .maybeSingle();
 
-    $("loginError").textContent =
-      "入力してください";
-
-    return;
+  if (error) {
+    console.error("getUser:", error);
+    return null;
   }
 
-  const passwordHash =
-    await hashPassword(password);
+  if (data) {
+    console.log("プロフィールデータ:", {
+      username: data.username,
+      program_urls: data.program_urls,
+      program_views: data.program_views,
+      program_likes: data.program_likes
+    });
 
-  const {data,error} =
-    await supabaseClient
+    cache.users.set(id, data);
+  }
+
+  return data;
+}
+
+
+
+async function getUsers(ids) {
+  const uniqueIds = [
+    ...new Set((ids || []).filter(Boolean))
+  ];
+
+  if (!uniqueIds.length) return [];
+
+  const missingIds = uniqueIds.filter(
+    id => !cache.users.has(id)
+  );
+
+  if (missingIds.length) {
+    const { data, error } = await supabaseClient
       .from("users")
-      .select("*")
-      .eq("username",username)
-      .eq("password_hash",passwordHash)
-      .maybeSingle();
+      .select(`
+        id,
+        username,
+        icon_url,
+        cover_url,
+        profile,
+        role,
+        ban_until
+      `)
+      .in("id", missingIds);
 
-  if(error){
+    if (error) {
+      console.error("getUsers:", error);
+    } else {
+      for (const user of data || []) {
+        cache.users.set(user.id, user);
+      }
+    }
+  }
 
-    console.error(error);
+  return uniqueIds
+    .map(id => cache.users.get(id))
+    .filter(Boolean);
+}
 
-    $("loginError").textContent =
-      error.message;
 
+/* =========================================================
+   Login
+   ========================================================= */
+
+async function login() {
+  const username = $("loginName").value.trim();
+  const password = $("loginPassword").value;
+
+  if (!username || !password) {
+    $("loginError").textContent = "入力してください";
     return;
   }
 
-  if(!data){
+  const passwordHash = await hashPassword(password);
 
+  const { data, error } = await supabaseClient
+    .from("users")
+    .select(`
+      id,
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      role,
+      ban_until,
+      program_urls
+    `)
+    .eq("username", username)
+    .eq("password_hash", passwordHash)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    $("loginError").textContent = error.message;
+    return;
+  }
+
+  if (!data) {
     $("loginError").textContent =
       "ユーザー名またはパスワードが違います";
-
     return;
   }
 
-  if(
+  if (
     data.ban_until &&
     new Date(data.ban_until) > new Date()
-  ){
-
+  ) {
     $("loginError").textContent =
       "このアカウントはBANされています";
-
     return;
   }
 
   currentUser = data;
+  cache.users.set(data.id, data);
 
   safeSet(
     "chanpro_post_user",
@@ -996,79 +1021,70 @@ async function login(){
   );
 
   await afterLogin();
-
 }
 
 
-async function createAccount(){
+async function createAccount() {
+  const username = $("loginName").value.trim();
+  const password = $("loginPassword").value;
 
-  const username =
-    $("loginName").value.trim();
-
-  const password =
-    $("loginPassword").value;
-
-  if(!username || !password){
-
+  if (!username || !password) {
     $("loginError").textContent =
       "ユーザー名とパスワードを入力してください";
-
     return;
   }
 
-  if(username.length < 2){
-
+  if (username.length < 2) {
     $("loginError").textContent =
       "ユーザー名は2文字以上にしてください";
-
     return;
   }
 
-  if(password.length < 6){
-
+  if (password.length < 6) {
     $("loginError").textContent =
       "パスワードは6文字以上にしてください";
-
     return;
   }
 
   const passwordHash =
     await hashPassword(password);
 
-  const {data,error} =
-    await supabaseClient
-      .from("users")
-      .insert({
+  const { data, error } = await supabaseClient
+    .from("users")
+    .insert({
+      username,
+      password_hash: passwordHash,
+      ban_count: 0,
+      ban_until: null,
+      icon_url: "",
+      profile: "",
+      role: "user"
+    })
+    .select(`
+      id,
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      role,
+      ban_until
+    `)
+    .single();
 
-        username,
-        password_hash:passwordHash,
-        ban_count:0,
-        ban_until:null,
-        icon_url:"",
-        profile:""
-
-      })
-      .select("*")
-      .single();
-
-  if(error){
-
-    if(error.code === "23505"){
-
+  if (error) {
+    if (error.code === "23505") {
       $("loginError").textContent =
         "そのユーザー名はすでに使用されています";
-
-    }else{
-
+    } else {
       $("loginError").textContent =
         error.message;
-
     }
 
     return;
   }
 
   currentUser = data;
+  cache.users.set(data.id, data);
 
   safeSet(
     "chanpro_post_user",
@@ -1076,74 +1092,73 @@ async function createAccount(){
   );
 
   await afterLogin();
-
 }
 
 
-async function afterLogin(){
-
-  $("loginPage").classList.add("hidden");
-  $("app").classList.remove("hidden");
-
-  await loadHome();
-  await loadTrends();
-  await loadSuggestedUsers();
-  await checkAdmin();
-
-}
-
-
-async function restoreLogin(){
-
+async function restoreLogin() {
   const id =
     safeGet("chanpro_post_user");
 
-  if(!id) return;
+  if (!id) return;
 
-  const {data,error} =
-    await supabaseClient
-      .from("users")
-      .select("*")
-      .eq("id",id)
-      .maybeSingle();
+  const user = await getUser(id);
 
-  if(error || !data) return;
+  if (!user) return;
 
-  if(
-    data.ban_until &&
-    new Date(data.ban_until) > new Date()
-  ){
-
+  if (
+    user.ban_until &&
+    new Date(user.ban_until) > new Date()
+  ) {
     safeRemove("chanpro_post_user");
     return;
   }
 
-  currentUser = data;
+  currentUser = user;
 
   await afterLogin();
-
 }
 
 
-function logout(){
+async function afterLogin() {
+  $("loginPage").classList.add("hidden");
+  $("app").classList.remove("hidden");
 
+  // MQTTリアルタイム通信開始
+  connectMQTT();
+
+  // DMのSupabase Realtime開始
+  subscribeDMRealtime();
+
+  await Promise.all([
+    loadHome(),
+    loadTrends(),
+    loadSuggestedUsers()
+  ]);
+
+  checkAdmin();
+}
+
+
+function logout() {
   currentUser = null;
 
-  safeRemove(
-    "chanpro_post_user"
-  );
+  cache.users.clear();
+  cache.posts.clear();
+  cache.follows = null;
+  cache.trends = null;
+  cache.suggestedUsers = null;
+
+  safeRemove("chanpro_post_user");
 
   location.reload();
-
 }
 
 
-/* =========================
-   ページ
-========================= */
+/* =========================================================
+   Navigation
+   ========================================================= */
 
-function hidePages(){
-
+function hidePages() {
   [
     "homePage",
     "searchPage",
@@ -1152,62 +1167,47 @@ function hidePages(){
     "profilePage",
     "bookmarksPage",
     "adminPage"
-  ].forEach(id =>
-    $(id).classList.add("hidden")
-  );
-
+  ].forEach(id => {
+    $(id).classList.add("hidden");
+  });
 }
 
 
-async function showPage(page){
-
+async function showPage(page) {
   hidePages();
 
-  if(page === "home"){
-
+  if (page === "home") {
     $("homePage").classList.remove("hidden");
     await loadHome();
-
   }
 
-  if(page === "search"){
-
+  if (page === "search") {
     $("searchPage").classList.remove("hidden");
-
   }
 
-  if(page === "notifications"){
-
+  if (page === "notifications") {
     $("notificationPage").classList.remove("hidden");
     await loadNotifications();
-
   }
 
-  if(page === "messages"){
-
+  if (page === "messages") {
     $("messagesPage").classList.remove("hidden");
     await loadDMs();
-
   }
 
-  if(page === "admin"){
-
+  if (page === "admin") {
     $("adminPage").classList.remove("hidden");
     await loadAdmin();
-
   }
-
 }
 
 
-/* =========================
-   投稿
-========================= */
+/* =========================================================
+   Post creation
+   ========================================================= */
 
-function openPostModal(){
-
+function openPostModal() {
   openModal(`
-
     <h2>投稿</h2>
 
     <textarea
@@ -1222,7 +1222,6 @@ function openPostModal(){
     >
 
     <div style="text-align:right;margin-top:10px">
-
       <button
         class="secondary"
         onclick="closeModal()"
@@ -1236,225 +1235,347 @@ function openPostModal(){
       >
         投稿
       </button>
-
     </div>
-
   `);
-
 }
 
 
-async function quickPost(){
-
+async function quickPost() {
   const text =
     $("quickPostText").value.trim();
 
   const image =
     $("quickPostImage").value.trim();
 
-  await createPost(
-    text,
-    image
-  );
+  await createPost(text, image);
 
-  $("quickPostText").value="";
-  $("quickPostImage").value="";
-
+  $("quickPostText").value = "";
+  $("quickPostImage").value = "";
 }
 
 
-async function submitPost(){
-
+async function submitPost() {
   const text =
     $("modalPostText").value.trim();
 
   const image =
     $("modalPostImage").value.trim();
 
-  await createPost(
-    text,
-    image
-  );
+  await createPost(text, image);
 
   closeModal();
-
 }
 
 
-async function createPost(text,image){
 
-  if(!text && !image){
-
+async function createPost(text, image) {
+  if (!text && !image) {
     toast("投稿内容を入力してください");
     return;
   }
 
-  if(image){
-
-    try{
-
-      const url =
-        new URL(image);
-
-      if(
-        url.protocol !== "http:" &&
-        url.protocol !== "https:"
-      ){
-
+  if (image) {
+    try {
+      const url = new URL(image);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
         toast("画像URLが正しくありません");
         return;
       }
-
-    }catch(e){
-
+    } catch {
       toast("画像URLが正しくありません");
       return;
     }
-
   }
 
-  const {data,error} =
-    await supabaseClient
-      .from("posts")
-      .insert({
+  const { data, error } = await supabaseClient
+    .from("posts")
+    .insert({
+      user_id: currentUser.id,
+      content: text,
+      image_url: image || null
+    })
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .single();
 
-        user_id:currentUser.id,
-        content:text,
-        image_url:image || null
-
-      })
-      .select("*")
-      .single();
-
-  if(error){
-
+  if (error) {
     console.error(error);
     toast("投稿に失敗しました");
     return;
   }
 
-  await extractHashtags(
-    data.id,
-    text
-  );
+  cache.posts.set(data.id, data);
+
+  await extractHashtags(data.id, text);
+
+  // フォロワーへ「新規投稿」通知
+  await notifyFollowersAboutPost(data.id);
+
+  // MQTTで全体へ新規投稿イベントを通知
+  mqttPublish(mqttTopicGlobal(), {
+    type: "post_created",
+    post_id: data.id,
+    user_id: currentUser.id
+  });
 
   toast("投稿しました");
-
   await loadHome();
-
 }
 
 
-async function extractHashtags(postId,text){
 
+/* =========================================================
+   Hashtags
+   ========================================================= */
+
+async function extractHashtags(
+  postId,
+  text
+) {
   const tags =
-    text.match(/#[\p{L}\p{N}_]+/gu) || [];
+    text.match(
+      /#[\p{L}\p{N}_]+/gu
+    ) || [];
 
-  const unique =
-    [...new Set(
-      tags.map(x =>
-        x.substring(1).toLowerCase()
+  const unique = [
+    ...new Set(
+      tags.map(
+        x => x.substring(1).toLowerCase()
       )
-    )];
+    )
+  ];
 
-  for(const tag of unique){
+  if (!unique.length) return;
 
-    await supabaseClient
-      .from("hashtags")
-      .upsert(
-        {
-          tag,
-          updated_at:new Date().toISOString()
-        },
-        {
-          onConflict:"tag"
-        }
-      );
+  /*
+   * hashtagsは一括upsert
+   */
+  await supabaseClient
+    .from("hashtags")
+    .upsert(
+      unique.map(tag => ({
+        tag,
+        updated_at:
+          new Date().toISOString()
+      })),
+      {
+        onConflict: "tag"
+      }
+    );
 
-    await supabaseClient
-      .from("post_hashtags")
-      .insert({
-        post_id:postId,
-        hashtag:tag
-      });
+  /*
+   * post_hashtagsも一括insert
+   */
+  await supabaseClient
+    .from("post_hashtags")
+    .insert(
+      unique.map(hashtag => ({
+        post_id: postId,
+        hashtag
+      }))
+    );
 
+  cache.trends = null;
+}
+
+
+/* =========================================================
+   Content
+   ========================================================= */
+
+function formatContent(text) {
+  let html =
+    escapeHTML(
+      (text || "").trim()
+    );
+
+  html = html.replace(
+    /(^|\s)#([\p{L}\p{N}_]+)/gu,
+    '$1<a href="#" onclick="searchHashtag(\'$2\');return false">#$2</a>'
+  );
+
+  html = html.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener">$1</a>'
+  );
+
+  return html;
+}
+
+
+/* =========================================================
+   Batch post metadata
+   ========================================================= */
+
+async function getPostMeta(postIds) {
+  const ids = [
+    ...new Set(postIds)
+  ];
+
+  if (!ids.length) {
+    return {
+      likes: new Map(),
+      replies: new Map(),
+      reposts: new Map(),
+      bookmarks: new Set(),
+      myLikes: new Set(),
+      myReposts: new Set()
+    };
   }
 
+  /*
+   * ここが今回の大幅削減ポイント。
+   *
+   * 旧:
+   *   投稿1 → 7アクセス
+   *   投稿2 → 7アクセス
+   *   投稿3 → 7アクセス
+   *   ...
+   *
+   * 新:
+   *   likes
+   *   replies
+   *   reposts
+   *   bookmarks
+   *
+   * をまとめて取得。
+   */
+
+  const [
+    likesResult,
+    repliesResult,
+    repostsResult,
+    bookmarksResult
+  ] = await Promise.all([
+    supabaseClient
+      .from("likes")
+      .select("post_id,user_id")
+      .in("post_id", ids),
+
+    supabaseClient
+      .from("replies")
+      .select("post_id")
+      .in("post_id", ids),
+
+    supabaseClient
+      .from("reposts")
+      .select("post_id,user_id")
+      .in("post_id", ids),
+
+    supabaseClient
+      .from("bookmarks")
+      .select("post_id,user_id")
+      .in("post_id", ids)
+      .eq("user_id", currentUser.id)
+  ]);
+
+  const likes =
+    new Map();
+
+  const replies =
+    new Map();
+
+  const reposts =
+    new Map();
+
+  const bookmarks =
+    new Set();
+
+  const myLikes =
+    new Set();
+
+  const myReposts =
+    new Set();
+
+  for (const row of likesResult.data || []) {
+    likes.set(
+      row.post_id,
+      (likes.get(row.post_id) || 0) + 1
+    );
+
+    if (
+      row.user_id === currentUser.id
+    ) {
+      myLikes.add(row.post_id);
+    }
+  }
+
+  for (const row of repliesResult.data || []) {
+    replies.set(
+      row.post_id,
+      (replies.get(row.post_id) || 0) + 1
+    );
+  }
+
+  for (const row of repostsResult.data || []) {
+    reposts.set(
+      row.post_id,
+      (reposts.get(row.post_id) || 0) + 1
+    );
+
+    if (
+      row.user_id === currentUser.id
+    ) {
+      myReposts.add(row.post_id);
+    }
+  }
+
+  for (const row of bookmarksResult.data || []) {
+    bookmarks.add(row.post_id);
+  }
+
+  return {
+    likes,
+    replies,
+    reposts,
+    bookmarks,
+    myLikes,
+    myReposts
+  };
 }
 
 
-/* =========================
-   投稿表示
-========================= */
+/* =========================================================
+   Post rendering
+   ========================================================= */
 
-async function createPostElement(post){
-
-  const user =
-    await getUser(post.user_id);
-
-  if(!user) return document.createElement("div");
-
+function createPostElement(
+  post,
+  user,
+  meta
+) {
   const article =
     document.createElement("article");
 
-  article.className="post";
+  article.className = "post";
 
-  const {count:likeCount} =
-    await supabaseClient
-      .from("likes")
-      .select("*",{
-        count:"exact",
-        head:true
-      })
-      .eq("post_id",post.id);
+  const likeCount =
+    meta.likes.get(post.id) || 0;
 
-  const {data:myLike} =
-    await supabaseClient
-      .from("likes")
-      .select("id")
-      .eq("post_id",post.id)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
+  const replyCount =
+    meta.replies.get(post.id) || 0;
 
-  const {count:replyCount} =
-    await supabaseClient
-      .from("replies")
-      .select("*",{
-        count:"exact",
-        head:true
-      })
-      .eq("post_id",post.id);
+  const repostCount =
+    meta.reposts.get(post.id) || 0;
 
-  const {count:repostCount} =
-    await supabaseClient
-      .from("reposts")
-      .select("*",{
-        count:"exact",
-        head:true
-      })
-      .eq("post_id",post.id);
+  const myLike =
+    meta.myLikes.has(post.id);
 
-  const {data:myRepost} =
-    await supabaseClient
-      .from("reposts")
-      .select("id")
-      .eq("post_id",post.id)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
+  const myRepost =
+    meta.myReposts.has(post.id);
 
-  const {data:bookmark} =
-    await supabaseClient
-      .from("bookmarks")
-      .select("id")
-      .eq("post_id",post.id)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
+  const bookmark =
+    meta.bookmarks.has(post.id);
 
   const own =
     post.user_id === currentUser.id;
 
   article.innerHTML = `
-
     <div class="postHead">
 
       <img
@@ -1483,16 +1604,14 @@ async function createPostElement(post){
 
         ${
           post.image_url
-          ?
-          `
-          <img
-            class="postImage"
-            src="${escapeHTML(post.image_url)}"
-            onerror="this.style.display='none'"
-          >
-          `
-          :
-          ""
+            ? `
+              <img
+                class="postImage"
+                src="${escapeHTML(post.image_url)}"
+                onerror="this.style.display='none'"
+              >
+            `
+            : ""
         }
 
         <div class="postActions">
@@ -1501,305 +1620,266 @@ async function createPostElement(post){
             class="action"
             onclick="replyPost('${post.id}')"
           >
-            💬 ${replyCount || 0}
+            💬 ${replyCount}
           </button>
 
           <button
-            class="action ${myRepost?'reposted':''}"
+            class="action ${myRepost ? "reposted" : ""}"
             onclick="toggleRepost('${post.id}')"
           >
-            🔁 ${repostCount || 0}
+            🔁 ${repostCount}
           </button>
 
           <button
-            class="action ${myLike?'liked':''}"
+            class="action ${myLike ? "liked" : ""}"
             onclick="toggleLike('${post.id}')"
           >
-            ❤️ ${likeCount || 0}
+            ❤️ ${likeCount}
           </button>
 
           <button
             class="action"
             onclick="toggleBookmark('${post.id}')"
           >
-            ${bookmark?'🔖':'📑'}
+            ${bookmark ? "🔖" : "📑"}
           </button>
 
           ${
             own
-            ?
-            `
-            <button
-              class="action"
-              onclick="deletePost('${post.id}')"
-            >
-              🗑️
-            </button>
-            `
-            :
-            `
-            <button
-              class="action"
-              onclick="reportPost('${post.id}','${user.id}')"
-            >
-              ⚠️
-            </button>
-            `
+              ? `
+                <button
+                  class="action"
+                  onclick="deletePost('${post.id}')"
+                >
+                  🗑️
+                </button>
+              `
+              : `
+                <button
+                  class="action"
+                  onclick="reportPost('${post.id}','${user.id}')"
+                >
+                  ⚠️
+                </button>
+              `
           }
 
         </div>
-
       </div>
-
     </div>
-
   `;
 
   return article;
-
 }
 
 
-function formatContent(text){
+/* =========================================================
+   Home
+   ========================================================= */
 
-  let html =
-    escapeHTML((text || "").trim());
-
-  html =
-    html.replace(
-      /(^|\s)#([\p{L}\p{N}_]+)/gu,
-      '$1<a href="#" onclick="searchHashtag(\'$2\');return false">#$2</a>'
-    );
-
-  html =
-    html.replace(
-      /(https?:\/\/[^\s<]+)/g,
-      '<a href="$1" target="_blank" rel="noopener">$1</a>'
-    );
-
-  return html;
-
-}
-
-
-function formatDate(date){
-
-  const d =
-    new Date(date);
-
-  return d.toLocaleString(
-    "ja-JP",
-    {
-      month:"numeric",
-      day:"numeric",
-      hour:"2-digit",
-      minute:"2-digit"
-    }
-  );
-
-}
-
-
-/* =========================
-   取得
-========================= */
-
-async function getUser(id){
-
-  const {data,error} =
-    await supabaseClient
-      .from("users")
-      .select("*")
-      .eq("id",id)
-      .maybeSingle();
-
-  if(error){
-
-    console.error(error);
-    return null;
-  }
-
-  return data;
-
-}
-
-
-async function loadHome(){
-
-  const box =
-    $("homePosts");
+async function loadHome() {
+  const box = $("homePosts");
 
   box.innerHTML =
     `<div class="empty">読み込み中...</div>`;
 
-  const {data,error} =
-    await supabaseClient
-      .from("posts")
-      .select("*")
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(100);
+  /*
+   * 100 → 50
+   * 最初の通信量を半分程度に。
+   */
+  const {
+    data: posts,
+    error
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(50);
 
-  if(error){
-
+  if (error) {
     console.error(error);
 
     box.innerHTML =
-      `<div class="empty">読み込みに失敗しました</div>`;
+      `<div class="empty">
+        読み込みに失敗しました
+      </div>`;
 
     return;
   }
 
-  box.innerHTML="";
-
-  if(!data || !data.length){
-
+  if (!posts || !posts.length) {
     box.innerHTML =
-      `<div class="empty">まだ投稿がありません</div>`;
+      `<div class="empty">
+        まだ投稿がありません
+      </div>`;
 
     return;
   }
 
-  for(const post of data){
+  /*
+   * ユーザーを一括取得
+   */
+  const userIds =
+    posts.map(post => post.user_id);
 
-    const element =
-      await createPostElement(post);
+  const users =
+    await getUsers(userIds);
 
-    box.appendChild(element);
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
 
+  /*
+   * リアクションを一括取得
+   */
+  const meta =
+    await getPostMeta(
+      posts.map(post => post.id)
+    );
+
+  box.innerHTML = "";
+
+  for (const post of posts) {
+    const user =
+      userMap.get(post.user_id);
+
+    if (!user) continue;
+
+    cache.posts.set(
+      post.id,
+      post
+    );
+
+    box.appendChild(
+      createPostElement(
+        post,
+        user,
+        meta
+      )
+    );
   }
-
 }
 
 
-/* =========================
-   いいね
-========================= */
+/* =========================================================
+   Like / Repost / Bookmark
+   ========================================================= */
 
-async function toggleLike(postId){
+async function toggleLike(postId) {
+  const {
+    data
+  } = await supabaseClient
+    .from("likes")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
 
-  const {data} =
-    await supabaseClient
-      .from("likes")
-      .select("id")
-      .eq("post_id",postId)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
-
-  if(data){
-
+  if (data) {
     await supabaseClient
       .from("likes")
       .delete()
-      .eq("id",data.id);
-
-  }else{
-
+      .eq("id", data.id);
+  } else {
     await supabaseClient
       .from("likes")
       .insert({
-        post_id:postId,
-        user_id:currentUser.id
+        post_id: postId,
+        user_id: currentUser.id
       });
 
     await createNotificationForPost(
       postId,
       "like"
     );
-
   }
 
   await refreshCurrentPage();
-
 }
 
 
-/* =========================
-   リポスト
-========================= */
+async function toggleRepost(postId) {
+  const {
+    data
+  } = await supabaseClient
+    .from("reposts")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
 
-async function toggleRepost(postId){
-
-  const {data} =
-    await supabaseClient
-      .from("reposts")
-      .select("id")
-      .eq("post_id",postId)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
-
-  if(data){
-
+  if (data) {
     await supabaseClient
       .from("reposts")
       .delete()
-      .eq("id",data.id);
-
-  }else{
-
+      .eq("id", data.id);
+  } else {
     await supabaseClient
       .from("reposts")
       .insert({
-        post_id:postId,
-        user_id:currentUser.id
+        post_id: postId,
+        user_id: currentUser.id
       });
 
     await createNotificationForPost(
       postId,
       "repost"
     );
-
   }
 
   await refreshCurrentPage();
-
 }
 
 
-/* =========================
-   ブックマーク
-========================= */
+async function toggleBookmark(postId) {
+  const {
+    data
+  } = await supabaseClient
+    .from("bookmarks")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
 
-async function toggleBookmark(postId){
-
-  const {data} =
-    await supabaseClient
-      .from("bookmarks")
-      .select("id")
-      .eq("post_id",postId)
-      .eq("user_id",currentUser.id)
-      .maybeSingle();
-
-  if(data){
-
+  if (data) {
     await supabaseClient
       .from("bookmarks")
       .delete()
-      .eq("id",data.id);
+      .eq("id", data.id);
 
     toast("ブックマークを解除しました");
-
-  }else{
-
+  } else {
     await supabaseClient
       .from("bookmarks")
       .insert({
-        post_id:postId,
-        user_id:currentUser.id
+        post_id: postId,
+        user_id: currentUser.id
       });
 
     toast("ブックマークしました");
-
   }
 
   await refreshCurrentPage();
-
 }
 
 
-async function showBookmarks(){
+/* =========================================================
+   Bookmarks
+   ========================================================= */
 
+async function showBookmarks() {
   hidePages();
 
   $("bookmarksPage")
@@ -1811,16 +1891,23 @@ async function showBookmarks(){
   box.innerHTML =
     `<div class="empty">読み込み中...</div>`;
 
-  const {data,error} =
-    await supabaseClient
-      .from("bookmarks")
-      .select("post_id")
-      .eq("user_id",currentUser.id)
-      .order("created_at",{
-        ascending:false
-      });
+  const {
+    data: bookmarks,
+    error
+  } = await supabaseClient
+    .from("bookmarks")
+    .select("post_id")
+    .eq(
+      "user_id",
+      currentUser.id
+    )
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(50);
 
-  if(error){
+  if (error) {
+    console.error(error);
 
     box.innerHTML =
       `<div class="empty">取得失敗</div>`;
@@ -1828,38 +1915,97 @@ async function showBookmarks(){
     return;
   }
 
-  box.innerHTML="";
+  const postIds =
+    (bookmarks || [])
+      .map(x => x.post_id);
 
-  for(const item of data || []){
+  if (!postIds.length) {
+    box.innerHTML =
+      `<div class="empty">
+        ブックマークはありません
+      </div>`;
 
-    const {data:post} =
-      await supabaseClient
-        .from("posts")
-        .select("*")
-        .eq("id",item.post_id)
-        .maybeSingle();
-
-    if(post){
-
-      box.appendChild(
-        await createPostElement(post)
-      );
-
-    }
-
+    return;
   }
 
+  const {
+    data: posts
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .in("id", postIds);
+
+  if (!posts?.length) {
+    box.innerHTML =
+      `<div class="empty">
+        投稿がありません
+      </div>`;
+
+    return;
+  }
+
+  const users =
+    await getUsers(
+      posts.map(post => post.user_id)
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  const meta =
+    await getPostMeta(
+      posts.map(post => post.id)
+    );
+
+  const postMap =
+    new Map(
+      posts.map(post => [
+        post.id,
+        post
+      ])
+    );
+
+  box.innerHTML = "";
+
+  for (const id of postIds) {
+    const post =
+      postMap.get(id);
+
+    if (!post) continue;
+
+    const user =
+      userMap.get(post.user_id);
+
+    if (!user) continue;
+
+    box.appendChild(
+      createPostElement(
+        post,
+        user,
+        meta
+      )
+    );
+  }
 }
 
 
-/* =========================
-   返信
-========================= */
+/* =========================================================
+   Reply
+   ========================================================= */
 
-async function replyPost(postId){
-
+async function replyPost(postId) {
   openModal(`
-
     <h2>返信</h2>
 
     <textarea
@@ -1869,72 +2015,117 @@ async function replyPost(postId){
     ></textarea>
 
     <div style="text-align:right">
-
       <button
         class="primary"
         onclick="submitReply('${postId}')"
       >
         返信
       </button>
-
     </div>
 
-    <div id="replyList"></div>
-
+    <div id="replyList">
+      読み込み中...
+    </div>
   `);
 
-  const {data} =
-    await supabaseClient
-      .from("replies")
-      .select("*")
-      .eq("post_id",postId)
-      .order("created_at",{
-        ascending:true
-      });
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("replies")
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at
+    `)
+    .eq("post_id", postId)
+    .order("created_at", {
+      ascending: true
+    });
 
-  for(const reply of data || []){
+  if (error) {
+    $("replyList").innerHTML =
+      `<div class="empty">
+        返信を取得できませんでした
+      </div>`;
 
+    return;
+  }
+
+  const users =
+    await getUsers(
+      (data || []).map(
+        reply => reply.user_id
+      )
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  const list =
+    $("replyList");
+
+  list.innerHTML = "";
+
+  for (const reply of data || []) {
     const user =
-      await getUser(reply.user_id);
+      userMap.get(reply.user_id);
 
-    $("replyList").innerHTML += `
-
-      <div style="
-        border-top:1px solid #e1e8ed;
-        padding:10px 0
-      ">
-
+    list.innerHTML += `
+      <div
+        style="
+          border-top:1px solid #e1e8ed;
+          padding:10px 0
+        "
+      >
         <b>
-          ${escapeHTML(user?.username || "ユーザー")}
+          ${escapeHTML(
+            user?.username || "ユーザー"
+          )}
         </b>
 
         <div>
           ${escapeHTML(reply.content)}
         </div>
-
       </div>
-
     `;
-
   }
 
+  if (!data?.length) {
+    list.innerHTML =
+      `<div class="empty">
+        まだ返信はありません
+      </div>`;
+  }
 }
 
 
-async function submitReply(postId){
-
+async function submitReply(postId) {
   const content =
     $("replyText").value.trim();
 
-  if(!content) return;
+  if (!content) return;
 
-  await supabaseClient
+  const {
+    error
+  } = await supabaseClient
     .from("replies")
     .insert({
-      post_id:postId,
-      user_id:currentUser.id,
+      post_id: postId,
+      user_id: currentUser.id,
       content
     });
+
+  if (error) {
+    toast("返信に失敗しました");
+    return;
+  }
 
   await createNotificationForPost(
     postId,
@@ -1944,18 +2135,15 @@ async function submitReply(postId){
   closeModal();
 
   await refreshCurrentPage();
-
 }
 
 
-/* =========================
-   削除
-========================= */
+/* =========================================================
+   Delete post
+   ========================================================= */
 
-function deletePost(postId){
-
+function deletePost(postId) {
   openModal(`
-
     <h2>投稿を削除</h2>
 
     <p style="margin:20px 0">
@@ -1980,286 +2168,458 @@ function deletePost(postId){
       </button>
 
     </div>
-
   `);
-
 }
 
 
-async function executeDeletePost(postId){
+async function executeDeletePost(postId) {
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("posts")
+    .delete()
+    .eq("id", postId)
+    .eq("user_id", currentUser.id)
+    .select("id");
 
-  const {data,error} =
-    await supabaseClient
-      .from("posts")
-      .delete()
-      .eq("id",postId)
-      .eq("user_id",currentUser.id)
-      .select("id");
-
-  if(error){
-
+  if (error) {
     console.error(error);
-
     closeModal();
-
     toast("削除できませんでした");
-
     return;
   }
 
-  if(!data || data.length === 0){
-
+  if (!data?.length) {
     closeModal();
-
     toast("削除する権限がありません");
-
     return;
   }
+
+  cache.posts.delete(postId);
 
   closeModal();
 
   toast("投稿を削除しました");
 
   await refreshCurrentPage();
-
 }
 
 
-/* =========================
-   プロフィール
-========================= */
+/* =========================================================
+   Profile
+   ========================================================= */
 
-async function showMyProfile(){
-
+async function showMyProfile() {
   await showUserProfile(
     currentUser.id
   );
-
 }
 
 
-async function showUserProfile(userId){
-
+async function showUserProfile(userId) {
   hidePages();
 
   $("profilePage")
     .classList.remove("hidden");
 
+  $("profilePage").innerHTML =
+    `<div class="empty">読み込み中...</div>`;
+
   const user =
     await getUser(userId);
 
-  if(!user){
-
+  if (!user) {
     $("profilePage").innerHTML =
-      `<div class="empty">ユーザーが見つかりません</div>`;
+      `<div class="empty">
+        ユーザーが見つかりません
+      </div>`;
 
     return;
   }
 
-  const {count:followersCount} =
-    await supabaseClient
+  /*
+   * 4つのCOUNTを並列化
+   */
+  const [
+    followersResult,
+    followingResult,
+    postsResult
+  ] = await Promise.all([
+    supabaseClient
       .from("follows")
-      .select("*",{
-        count:"exact",
-        head:true
+      .select("*", {
+        count: "exact",
+        head: true
       })
-      .eq("following_id",userId);
+      .eq("following_id", userId),
 
-  const {count:followingCount} =
-    await supabaseClient
+    supabaseClient
       .from("follows")
-      .select("*",{
-        count:"exact",
-        head:true
+      .select("*", {
+        count: "exact",
+        head: true
       })
-      .eq("follower_id",userId);
+      .eq("follower_id", userId),
 
-  const {count:postCount} =
-    await supabaseClient
+    supabaseClient
       .from("posts")
-      .select("*",{
-        count:"exact",
-        head:true
+      .select("*", {
+        count: "exact",
+        head: true
       })
-      .eq("user_id",userId);
+      .eq("user_id", userId)
+  ]);
 
-  let isFollowing=false;
+  let isFollowing = false;
 
-  if(userId !== currentUser.id){
-
-    const {data} =
+  if (userId !== currentUser.id) {
+    /*
+     * キャッシュ可能なフォロー情報
+     */
+    const { data } =
       await supabaseClient
         .from("follows")
         .select("id")
-        .eq("follower_id",currentUser.id)
-        .eq("following_id",userId)
+        .eq(
+          "follower_id",
+          currentUser.id
+        )
+        .eq(
+          "following_id",
+          userId
+        )
         .maybeSingle();
 
-    isFollowing=!!data;
-
+    isFollowing = !!data;
   }
 
-  $("profilePage").innerHTML = `
+  const followersCount =
+    followersResult.count || 0;
 
-    <div class="profilePage">
+  const followingCount =
+    followingResult.count || 0;
 
-    <div
-      class="profileCover"
-      style="
-        background-image:
-          url('${escapeHTML(
-            user.cover_url || ""
-          )}');
-      "
-    ></div>
+  const postCount =
+    postsResult.count || 0;
 
-      <div class="profileInfo">
 
-        <img
-          class="profileBigAvatar"
-          src="${avatarURL(user.icon_url,100)}"
-        >
+$("profilePage").innerHTML = `
 
-        <div class="profileActions">
+  <div class="profileCover" style="background-image:url('${escapeHTML(user.cover_url || "")}');"></div>
+
+  <div class="profileInfo">
+
+    <img
+      class="profileBigAvatar"
+      src="${avatarURL(
+        user.icon_url,
+        100
+      )}"
+    >
+
+    <div class="profileActions">
+
+      ${
+        userId === currentUser.id
+          ? `
+            <button
+              class="secondary"
+              onclick="openProfileEdit()"
+            >
+              プロフィール編集
+            </button>
+          `
+          : `
+            <div
+              style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+              "
+            >
+
+              <button
+                class="${
+                  isFollowing
+                    ? "secondary"
+                    : "primary"
+                }"
+                onclick="toggleFollow('${userId}')"
+              >
+                ${
+                  isFollowing
+                    ? "フォロー中"
+                    : "フォロー"
+                }
+              </button>
+
+              <button
+                class="secondary"
+                onclick="openDM('${userId}')"
+              >
+                ✉️ DM
+              </button>
+
+            </div>
+          `
+      }
+
+    </div>
+
+    <h2>
+      ${escapeHTML(user.username)}
+    </h2>
+
+    <div class="profileHandle">
+      @${escapeHTML(user.username)}
+    </div>
+
+    <div class="profileBio">${escapeHTML((user.profile || "自己紹介はありません").trim())}</div>
+
+    ${
+      Array.isArray(user.program_urls) &&
+      user.program_urls.length
+        ? `
+          <div
+            class="programStats"
+            style="
+              margin-top:15px;
+            "
+          >
+
+            <h3 style="margin-bottom:10px;">
+              プログラム
+            </h3>
+
+
 ${
-  userId===currentUser.id
-  ?
+  Array.isArray(user.program_urls) &&
+  user.program_urls.length > 0
+    ? `
+      <div
+        style="
+          display:flex;
+          gap:30px;
+          margin:20px 0;
+          align-items:center;
+        "
+      >
 
-  `
-  <button
-    class="secondary"
-    onclick="openProfileEdit()"
-  >
-    プロフィール編集
-  </button>
-  `
+        ${
+          Array.isArray(user.program_views) &&
+          user.program_views.some(v => v != null)
+            ? `
+              <div style="text-align:center;">
+                <div
+                  style="
+                    font-size:28px;
+                    font-weight:700;
+                  "
+                >
+                  👀️ ${user.program_views
+                    .reduce(
+                      (sum, value) =>
+                        sum + (Number(value) || 0),
+                      0
+                    )
+                    .toLocaleString("ja-JP")}
+                </div>
 
-  :
+                <div
+                  style="
+                    font-size:14px;
+                    color:#657786;
+                    margin-top:3px;
+                  "
+                >
+                  閲覧
+                </div>
+              </div>
+            `
+            : ""
+        }
 
-  `
-  <div style="
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  ">
+        ${
+          Array.isArray(user.program_likes) &&
+          user.program_likes.some(v => v != null)
+            ? `
+              <div style="text-align:center;">
+                <div
+                  style="
+                    font-size:28px;
+                    font-weight:700;
+                  "
+                >
+                  ❤️ ${user.program_likes
+                    .reduce(
+                      (sum, value) =>
+                        sum + (Number(value) || 0),
+                      0
+                    )
+                    .toLocaleString("ja-JP")}
+                </div>
 
-    <button
-      class="${isFollowing?'secondary':'primary'}"
-      onclick="toggleFollow('${userId}')"
-    >
-      ${isFollowing?'フォロー中':'フォロー'}
-    </button>
+                <div
+                  style="
+                    font-size:14px;
+                    color:#657786;
+                    margin-top:3px;
+                  "
+                >
+                  いいね
+                </div>
+              </div>
+            `
+            : ""
+        }
 
-    <button
-      class="secondary"
-      onclick="openDM('${userId}')"
-    >
-      ✉️ DM
-    </button>
-
-  </div>
-  `
+      </div>
+    `
+    : ""
 }
 
 
-        </div>
-
-        <h2>
-          ${escapeHTML(user.username)}
-        </h2>
-
-        <div class="profileHandle">
-          @${escapeHTML(user.username)}
-        </div>
-
-        <div class="profileBio">${escapeHTML(
-          (user.profile || "自己紹介はありません").trim()
-        )}</div>
-        <div class="profileStats">
-        
-          <div
-            class="profileStatClickable"
-            onclick="showFollowList('${userId}','following')"
-          >
-            <b>${followingCount || 0}</b>
-            <span>フォロー中</span>
           </div>
-        
-          <div
-            class="profileStatClickable"
-            onclick="showFollowList('${userId}','followers')"
-          >
-            <b>${followersCount || 0}</b>
-            <span>フォロワー</span>
-          </div>
-        
-          <div>
-            <b>${postCount || 0}</b>
-            <span>投稿</span>
-          </div>
-        
-        </div>
+        `
+        : ""
+    }
 
+    <div class="profileStats">
+
+      <div
+        class="profileStatClickable"
+        onclick="
+          showFollowList(
+            '${userId}',
+            'following'
+          )
+        "
+      >
+        <b>${followingCount}</b>
+        <span>フォロー中</span>
+      </div>
+
+      <div
+        class="profileStatClickable"
+        onclick="
+          showFollowList(
+            '${userId}',
+            'followers'
+          )
+        "
+      >
+        <b>${followersCount}</b>
+        <span>フォロワー</span>
+      </div>
+
+      <div>
+        <b>${postCount}</b>
+        <span>投稿</span>
       </div>
 
     </div>
 
-    <div id="profilePosts"></div>
+  </div>
 
-  `;
+</div>
 
-  const {data:userPosts} =
-    await supabaseClient
-      .from("posts")
-      .select("*")
-      .eq("user_id",userId)
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(50);
+<div id="profilePosts"></div>
+
+`;
+
+
+  /*
+   * 投稿と関連ユーザーを一括取得
+   */
+  const {
+    data: userPosts
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .eq("user_id", userId)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(50);
 
   const box =
     $("profilePosts");
 
-  for(const post of userPosts || []){
+  if (!userPosts?.length) {
+    box.innerHTML =
+      `<div class="empty">
+        まだ投稿がありません
+      </div>`;
 
-    box.appendChild(
-      await createPostElement(post)
-    );
-
+    return;
   }
 
+  const meta =
+    await getPostMeta(
+      userPosts.map(post => post.id)
+    );
+
+  for (const post of userPosts) {
+    box.appendChild(
+      createPostElement(
+        post,
+        user,
+        meta
+      )
+    );
+  }
 }
 
-async function showFollowList(userId, type){
 
-  const user = await getUser(userId);
+/* =========================================================
+   Follow list
+   ========================================================= */
 
-  if(!user) return;
+async function showFollowList(
+  userId,
+  type
+) {
+  const user =
+    await getUser(userId);
 
-  const isFollowers = type === "followers";
+  if (!user) return;
 
-  const title = isFollowers
-    ? "フォロワー"
-    : "フォロー中";
+  const isFollowers =
+    type === "followers";
 
-  const column = isFollowers
-    ? "following_id"
-    : "follower_id";
+  const title =
+    isFollowers
+      ? "フォロワー"
+      : "フォロー中";
 
-  const {data, error} =
-    await supabaseClient
-      .from("follows")
-      .select("follower_id, following_id")
-      .eq(column, userId);
+  const column =
+    isFollowers
+      ? "following_id"
+      : "follower_id";
 
-  if(error){
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("follows")
+    .select(`
+      follower_id,
+      following_id
+    `)
+    .eq(column, userId);
 
+  if (error) {
     console.error(error);
 
     openModal(`
       <h2>${title}</h2>
-
       <div class="empty">
         一覧を取得できませんでした
       </div>
@@ -2269,51 +2629,85 @@ async function showFollowList(userId, type){
   }
 
   openModal(`
-    <h2>${escapeHTML(user.username)} の${title}</h2>
+    <h2>
+      ${escapeHTML(user.username)}
+      の${title}
+    </h2>
 
     <div id="followList"></div>
   `);
 
-  const box = $("followList");
+  const box =
+    $("followList");
 
-  if(!data || !data.length){
-
-    box.innerHTML = `
-      <div class="empty">
+  if (!data?.length) {
+    box.innerHTML =
+      `<div class="empty">
         ${title}はいません
-      </div>
-    `;
+      </div>`;
 
     return;
   }
 
-  for(const item of data){
+  const targetIds =
+    data.map(item =>
+      isFollowers
+        ? item.follower_id
+        : item.following_id
+    );
 
+  /*
+   * ユーザーを一括取得
+   */
+  const users =
+    await getUsers(targetIds);
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  /*
+   * 自分がフォローしている人を一括取得
+   */
+  const {
+    data: myFollows
+  } = await supabaseClient
+    .from("follows")
+    .select("following_id")
+    .eq(
+      "follower_id",
+      currentUser.id
+    )
+    .in(
+      "following_id",
+      targetIds
+    );
+
+  const followingSet =
+    new Set(
+      (myFollows || [])
+        .map(x => x.following_id)
+    );
+
+  for (const item of data) {
     const targetUserId =
       isFollowers
         ? item.follower_id
         : item.following_id;
 
     const targetUser =
-      await getUser(targetUserId);
+      userMap.get(targetUserId);
 
-    if(!targetUser) continue;
+    if (!targetUser) continue;
 
-    let isFollowing = false;
-
-    if(targetUser.id !== currentUser.id){
-
-      const {data: followData} =
-        await supabaseClient
-          .from("follows")
-          .select("id")
-          .eq("follower_id", currentUser.id)
-          .eq("following_id", targetUser.id)
-          .maybeSingle();
-
-      isFollowing = !!followData;
-
-    }
+    const isFollowing =
+      followingSet.has(
+        targetUser.id
+      );
 
     const row =
       document.createElement("div");
@@ -2321,10 +2715,12 @@ async function showFollowList(userId, type){
     row.className = "userRow";
 
     row.innerHTML = `
-
       <img
         class="avatar"
-        src="${avatarURL(targetUser.icon_url,45)}"
+        src="${avatarURL(
+          targetUser.icon_url,
+          45
+        )}"
         style="cursor:pointer"
       >
 
@@ -2332,175 +2728,158 @@ async function showFollowList(userId, type){
         class="userRowInfo"
         style="cursor:pointer"
       >
-
         <b>
-          ${escapeHTML(targetUser.username)}
+          ${escapeHTML(
+            targetUser.username
+          )}
         </b>
 
         <div class="handle">
-          @${escapeHTML(targetUser.username)}
+          @${escapeHTML(
+            targetUser.username
+          )}
         </div>
-
       </div>
 
-${
-  targetUser.id !== currentUser.id
-  ?
-  `
-  <button
-    class="${isFollowing ? "secondary" : "primary"}"
-    onclick="toggleFollowFromList('${targetUser.id}','${userId}','${type}')"
-  >
-    ${isFollowing ? "フォロー中" : "フォロー"}
-  </button>
-  `
-  :
-  ""
-}
-
+      ${
+        targetUser.id !== currentUser.id
+          ? `
+            <button
+              class="${
+                isFollowing
+                  ? "secondary"
+                  : "primary"
+              }"
+            >
+              ${
+                isFollowing
+                  ? "フォロー中"
+                  : "フォロー"
+              }
+            </button>
+          `
+          : ""
+      }
     `;
 
-    // アイコンをクリック → プロフィール
-    row.querySelector(".avatar").onclick = () => {
-
+    row.querySelector(
+      ".avatar"
+    ).onclick = () => {
       closeModal();
-
       showUserProfile(
         targetUser.id
       );
-
     };
 
-    // ユーザー名をクリック → プロフィール
-    row.querySelector(".userRowInfo").onclick = () => {
-
+    row.querySelector(
+      ".userRowInfo"
+    ).onclick = () => {
       closeModal();
-
       showUserProfile(
         targetUser.id
       );
-
     };
+
+    const button =
+      row.querySelector("button");
+
+    if (button) {
+      button.onclick = async () => {
+        await toggleFollowFromList(
+          targetUser.id,
+          userId,
+          type
+        );
+      };
+    }
 
     box.appendChild(row);
-
   }
-
 }
+
+
 async function toggleFollowFromList(
   targetUserId,
   profileUserId,
   type
-){
+) {
+  await toggleFollow(
+    targetUserId,
+    false
+  );
 
-  const {data} =
-    await supabaseClient
-      .from("follows")
-      .select("id")
-      .eq("follower_id", currentUser.id)
-      .eq("following_id", targetUserId)
-      .maybeSingle();
+  await showFollowList(
+    profileUserId,
+    type
+  );
+}
 
-  if(data){
 
+async function toggleFollow(
+  userId,
+  reloadProfile = true
+) {
+  if (userId === currentUser.id) {
+    return;
+  }
+
+  const {
+    data
+  } = await supabaseClient
+    .from("follows")
+    .select("id")
+    .eq(
+      "follower_id",
+      currentUser.id
+    )
+    .eq(
+      "following_id",
+      userId
+    )
+    .maybeSingle();
+
+  if (data) {
     await supabaseClient
       .from("follows")
       .delete()
       .eq("id", data.id);
 
     toast("フォローを解除しました");
-
-  }else{
-
+  } else {
     await supabaseClient
       .from("follows")
       .insert({
         follower_id: currentUser.id,
-        following_id: targetUserId
+        following_id: userId
       });
-
-    if(targetUserId !== currentUser.id){
 
     await createNotification({
-    
-      user_id:userId,
-    
-      actor_id:currentUser.id,
-    
-      type:"follow"
-    
+      user_id: userId,
+      actor_id: currentUser.id,
+      type: "follow"
     });
 
-    }
-
     toast("フォローしました");
-
   }
 
-  // 一覧を再表示してボタン状態を更新
-  await showFollowList(
-    profileUserId,
-    type
-  );
+  cache.suggestedUsers = null;
 
-}
-/* =========================
-   フォロー
-========================= */
-
-async function toggleFollow(userId){
-
-  const {data} =
-    await supabaseClient
-      .from("follows")
-      .select("id")
-      .eq("follower_id",currentUser.id)
-      .eq("following_id",userId)
-      .maybeSingle();
-
-  if(data){
-
-    await supabaseClient
-      .from("follows")
-      .delete()
-      .eq("id",data.id);
-
-    toast("フォローを解除しました");
-
-  }else{
-
-    await supabaseClient
-      .from("follows")
-      .insert({
-        follower_id:currentUser.id,
-        following_id:userId
-      });
-
-    await supabaseClient
-      .from("notifications")
-      .insert({
-        user_id:userId,
-        actor_id:currentUser.id,
-        type:"follow"
-      });
-
-    toast("フォローしました");
-
+  if (reloadProfile) {
+    await showUserProfile(userId);
   }
-
-  await showUserProfile(userId);
-
 }
 
 
-/* =========================
-   プロフィール編集
-========================= */
+/* =========================================================
+   Profile edit
+   ========================================================= */
 
-function openProfileEdit(){
+function openProfileEdit() {
+  const programUrl = Array.isArray(currentUser.program_urls)
+    ? (currentUser.program_urls[0] || "")
+    : "";
 
   openModal(`
-
     <h2>プロフィール編集</h2>
 
     <input
@@ -2527,188 +2906,232 @@ function openProfileEdit(){
       style="height:120px"
     >${escapeHTML(currentUser.profile || "")}</textarea>
 
-    <button
-      class="primary"
-      onclick="saveProfileEdit()"
-    >
-      保存
-    </button>
+    <div style="margin-top:15px">
+      <b>プログラムURL</b>
 
+      <div class="handle" style="margin:6px 0">
+        chanpro.jpのプログラムプロフィールURLを1つ設定できます
+      </div>
+
+      <input
+        id="editProgramUrl"
+        value="${escapeHTML(programUrl)}"
+        placeholder="https://chanpro.jp/00-program-profile/..."
+      >
+    </div>
+
+    <div style="text-align:right;margin-top:10px">
+      <button class="secondary" onclick="closeModal()">キャンセル</button>
+      <button class="primary" onclick="saveProfileEdit()">保存</button>
+    </div>
   `);
+}
+function validProgramUrl(value) {
+  if (!value) return true;
 
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "chanpro.jp" &&
+      url.pathname.startsWith("/00-program-profile/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function validHttpUrl(value) {
+  if (!value) return true;
+
+  try {
+    const url =
+      new URL(value);
+
+    return (
+      url.protocol === "http:" ||
+      url.protocol === "https:"
+    );
+  } catch {
+    return false;
+  }
 }
 
 
-async function saveProfileEdit(){
 
-  const username =
-    $("editUsername").value.trim();
+async function saveProfileEdit() {
+  const username = $("editUsername").value.trim();
+  const icon_url = $("editIcon").value.trim();
+  const cover_url = $("editCover").value.trim();
+  const profile = $("editBio").value.trim();
+  const programUrl = $("editProgramUrl").value.trim();
 
-  const icon_url =
-    $("editIcon").value.trim();
-
-  const cover_url =
-    $("editCover").value.trim();
-
-  const profile =
-    $("editBio").value.trim();
-
-  if(!username){
-
+  // =========================
+  // 基本入力チェック
+  // =========================
+  if (!username) {
     toast("ユーザー名を入力してください");
     return;
-
   }
 
-  // アイコンURLのチェック
-  if(icon_url){
+  // =========================
+  // アイコンURLチェック
+  // =========================
+  if (!validHttpUrl(icon_url)) {
+    toast("アイコン画像URLが正しくありません");
+    return;
+  }
 
-    try{
+  // =========================
+  // 背景画像URLチェック
+  // =========================
+  if (!validHttpUrl(cover_url)) {
+    toast("背景URLが正しくありません");
+    return;
+  }
 
-      const url =
-        new URL(icon_url);
+  // =========================
+  // プログラムURLチェック
+  // 空欄は許可
+  // =========================
+  if (programUrl && !validProgramUrl(programUrl)) {
+    toast("chanpro.jpのプログラムプロフィールURLを入力してください");
+    return;
+  }
 
-      if(
-        url.protocol !== "http:" &&
-        url.protocol !== "https:"
-      ){
+  // =========================
+  // text[] に保存
+  // 1ユーザーにつき1URL
+  // =========================
+  const program_urls = programUrl
+    ? [programUrl]
+    : [];
 
-        toast("アイコン画像URLが正しくありません");
-        return;
+  // =========================
+  // Supabaseへ保存
+  // =========================
+  const { data, error } = await supabaseClient
+    .from("users")
+    .update({
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      program_urls
+    })
+    .eq("id", currentUser.id)
+    .select(`
+      id,
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      program_urls,
+      role,
+      ban_until
+    `)
+    .single();
 
-      }
+  // =========================
+  // 保存エラー
+  // =========================
+  if (error) {
+    console.error("saveProfileEdit:", error);
 
-    }catch(e){
-
-      toast("アイコン画像URLが正しくありません");
-      return;
-
+    if (error.code === "23505") {
+      toast("そのユーザー名は使用されています");
+    } else {
+      toast("プロフィールを保存できませんでした");
     }
-
-  }
-
-  // 背景URLのチェック
-  if(cover_url){
-
-    try{
-
-      const url =
-        new URL(cover_url);
-
-      if(
-        url.protocol !== "http:" &&
-        url.protocol !== "https:"
-      ){
-
-        toast("背景画像URLが正しくありません");
-        return;
-
-      }
-
-    }catch(e){
-
-      toast("背景画像URLが正しくありません");
-      return;
-
-    }
-
-  }
-
-  const {data,error} =
-    await supabaseClient
-      .from("users")
-      .update({
-        username,
-        icon_url,
-        cover_url,
-        profile
-      })
-      .eq("id",currentUser.id)
-      .select("*")
-      .single();
-
-  if(error){
-
-    console.error(error);
-
-    toast(
-      error.code==="23505"
-        ?
-        "そのユーザー名は使用されています"
-        :
-        "保存できませんでした"
-    );
 
     return;
-
   }
 
+  // =========================
+  // 現在のユーザー情報を更新
+  // =========================
   currentUser = data;
+  cache.users.set(data.id, data);
 
+  // =========================
+  // モーダルを閉じる
+  // =========================
   closeModal();
 
+  // =========================
+  // プロフィールを再表示
+  // =========================
   await showMyProfile();
 
   toast("プロフィールを保存しました");
-
 }
 
 
-/* =========================
-   検索
-========================= */
 
-async function searchAll(){
+/* =========================================================
+   Search
+   ========================================================= */
 
+async function searchAll() {
   const q =
     $("searchInput").value.trim();
 
-  if(!q) return;
+  if (!q) return;
+
+  if (q.startsWith("#")) {
+    await searchHashtag(
+      q.substring(1)
+    );
+    return;
+  }
 
   const box =
     $("searchResults");
 
   box.innerHTML =
-    `<div class="empty">検索中...</div>`;
+    `<div class="empty">
+      検索中...
+    </div>`;
 
-  if(q.startsWith("#")){
-
-    await searchHashtag(
-      q.substring(1)
-    );
-
-    return;
-
-  }
-
-  const {data:users,error:userError} =
-    await supabaseClient
+  const [
+    usersResult,
+    postsResult
+  ] = await Promise.all([
+    supabaseClient
       .from("users")
-      .select("*")
+      .select(`
+        id,
+        username,
+        icon_url,
+        profile
+      `)
       .ilike(
         "username",
         `%${q}%`
       )
-      .limit(20);
+      .limit(20),
 
-  const {data:posts,error:postError} =
-    await supabaseClient
+    supabaseClient
       .from("posts")
-      .select("*")
+      .select(`
+        id,
+        user_id,
+        content,
+        image_url,
+        created_at
+      `)
       .ilike(
         "content",
         `%${q}%`
       )
-      .order("created_at",{
-        ascending:false
+      .order("created_at", {
+        ascending: false
       })
-      .limit(50);
+      .limit(30)
+  ]);
 
   box.innerHTML = "";
-
-  /* =========================
-     ユーザー検索結果
-  ========================= */
 
   const userTitle =
     document.createElement("h3");
@@ -2718,35 +3141,24 @@ async function searchAll(){
 
   box.appendChild(userTitle);
 
-  if(userError){
-
-    const errorBox =
-      document.createElement("div");
-
-    errorBox.className =
-      "empty";
-
-    errorBox.textContent =
-      "ユーザー検索に失敗しました";
-
-    box.appendChild(errorBox);
-
-  }else if(!users || !users.length){
-
-    const empty =
-      document.createElement("div");
-
-    empty.className =
-      "empty";
-
-    empty.textContent =
-      "ユーザーが見つかりません";
-
-    box.appendChild(empty);
-
-  }else{
-
-    for(const user of users){
+  if (usersResult.error) {
+    box.innerHTML +=
+      `<div class="empty">
+        ユーザー検索に失敗しました
+      </div>`;
+  } else if (
+    !usersResult.data?.length
+  ) {
+    box.innerHTML +=
+      `<div class="empty">
+        ユーザーが見つかりません
+      </div>`;
+  } else {
+    for (const user of usersResult.data) {
+      cache.users.set(
+        user.id,
+        user
+      );
 
       const row =
         document.createElement("div");
@@ -2755,10 +3167,12 @@ async function searchAll(){
         "userRow";
 
       row.innerHTML = `
-
         <img
           class="avatar"
-          src="${avatarURL(user.icon_url,45)}"
+          src="${avatarURL(
+            user.icon_url,
+            45
+          )}"
           style="cursor:pointer"
         >
 
@@ -2766,7 +3180,6 @@ async function searchAll(){
           class="userRowInfo"
           style="cursor:pointer;flex:1"
         >
-
           <b>
             ${escapeHTML(user.username)}
           </b>
@@ -2774,34 +3187,22 @@ async function searchAll(){
           <div class="handle">
             @${escapeHTML(user.username)}
           </div>
-
         </div>
-
       `;
 
-      row.querySelector(".avatar").onclick =
-        () => {
+      row.querySelector(
+        ".avatar"
+      ).onclick = () =>
+        showUserProfile(user.id);
 
-          showUserProfile(user.id);
-
-        };
-
-      row.querySelector(".userRowInfo").onclick =
-        () => {
-
-          showUserProfile(user.id);
-
-        };
+      row.querySelector(
+        ".userRowInfo"
+      ).onclick = () =>
+        showUserProfile(user.id);
 
       box.appendChild(row);
-
     }
-
   }
-
-  /* =========================
-     投稿検索結果
-  ========================= */
 
   const postTitle =
     document.createElement("h3");
@@ -2814,192 +3215,493 @@ async function searchAll(){
 
   box.appendChild(postTitle);
 
-  if(postError){
+  if (postsResult.error) {
+    box.innerHTML +=
+      `<div class="empty">
+        投稿検索に失敗しました
+      </div>`;
 
-    const errorBox =
-      document.createElement("div");
-
-    errorBox.className =
-      "empty";
-
-    errorBox.textContent =
-      "投稿検索に失敗しました";
-
-    box.appendChild(errorBox);
-
-  }else if(!posts || !posts.length){
-
-    const empty =
-      document.createElement("div");
-
-    empty.className =
-      "empty";
-
-    empty.textContent =
-      "投稿が見つかりません";
-
-    box.appendChild(empty);
-
-  }else{
-
-    for(const post of posts){
-
-      box.appendChild(
-        await createPostElement(post)
-      );
-
-    }
-
+    return;
   }
 
+  if (!postsResult.data?.length) {
+    box.innerHTML +=
+      `<div class="empty">
+        投稿が見つかりません
+      </div>`;
+
+    return;
+  }
+
+  const posts =
+    postsResult.data;
+
+  const users =
+    await getUsers(
+      posts.map(post =>
+        post.user_id
+      )
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  const meta =
+    await getPostMeta(
+      posts.map(post => post.id)
+    );
+
+  for (const post of posts) {
+    const user =
+      userMap.get(post.user_id);
+
+    if (!user) continue;
+
+    box.appendChild(
+      createPostElement(
+        post,
+        user,
+        meta
+      )
+    );
+  }
 }
 
 
-
-async function searchHashtag(tag){
-
+async function searchHashtag(tag) {
   hidePages();
 
   $("searchPage")
     .classList.remove("hidden");
 
-  const {data:links} =
-    await supabaseClient
-      .from("post_hashtags")
-      .select("post_id")
-      .eq("hashtag",tag)
-      .limit(100);
-
   const box =
     $("searchResults");
 
   box.innerHTML =
-    `<h2>#${escapeHTML(tag)}</h2>`;
+    `<h2>#${escapeHTML(tag)}</h2>
+     <div class="empty">読み込み中...</div>`;
 
-  for(const link of links || []){
+  const {
+    data: links,
+    error
+  } = await supabaseClient
+    .from("post_hashtags")
+    .select("post_id")
+    .eq("hashtag", tag)
+    .limit(50);
 
-    const {data:post} =
-      await supabaseClient
-        .from("posts")
-        .select("*")
-        .eq("id",link.post_id)
-        .maybeSingle();
+  if (error) {
+    box.innerHTML =
+      `<div class="empty">
+        検索できませんでした
+      </div>`;
 
-    if(post){
-
-      box.appendChild(
-        await createPostElement(post)
-      );
-
-    }
-
+    return;
   }
 
+  const postIds =
+    (links || [])
+      .map(x => x.post_id);
+
+  if (!postIds.length) {
+    box.innerHTML =
+      `<h2>#${escapeHTML(tag)}</h2>
+       <div class="empty">
+         投稿がありません
+       </div>`;
+
+    return;
+  }
+
+  const {
+    data: posts
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .in("id", postIds)
+    .order("created_at", {
+      ascending: false
+    });
+
+  const users =
+    await getUsers(
+      (posts || []).map(
+        post => post.user_id
+      )
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  const meta =
+    await getPostMeta(
+      (posts || []).map(
+        post => post.id
+      )
+    );
+
+  box.innerHTML =
+    `<h2>#${escapeHTML(tag)}</h2>`;
+
+  for (const post of posts || []) {
+    const user =
+      userMap.get(post.user_id);
+
+    if (!user) continue;
+
+    box.appendChild(
+      createPostElement(
+        post,
+        user,
+        meta
+      )
+    );
+  }
 }
 
 
-/* =========================
-   通知
-========================= */
+/* =========================================================
+   Notifications
+   ========================================================= */
+
+async function notifyFollowersAboutPost(postId) {
+  // 投稿IDがない場合は処理しない
+  if (!postId) {
+    console.warn("notifyFollowersAboutPost: postIdがありません");
+    return;
+  }
+
+  // ログインユーザーがいない場合は処理しない
+  if (!currentUser?.id) {
+    console.warn("notifyFollowersAboutPost: currentUserがありません");
+    return;
+  }
+
+  try {
+    // ==========================================
+    // 1. 自分をフォローしているユーザーを取得
+    // ==========================================
+    const { data: followers, error: followersError } =
+      await supabaseClient
+        .from("follows")
+        .select("follower_id")
+        .eq("following_id", currentUser.id);
+
+    if (followersError) {
+      console.error(
+        "notifyFollowersAboutPost: フォロワー取得失敗",
+        followersError
+      );
+      return;
+    }
+
+    if (!followers?.length) {
+      console.log(
+        "notifyFollowersAboutPost: フォロワーはいません"
+      );
+      return;
+    }
+
+    // ==========================================
+    // 2. 自分自身を除外
+    // ==========================================
+    const followerIds = [
+      ...new Set(
+        followers
+          .map(row => row.follower_id)
+          .filter(
+            userId =>
+              userId &&
+              userId !== currentUser.id
+          )
+      )
+    ];
+
+    if (!followerIds.length) {
+      return;
+    }
+
+    // ==========================================
+    // 3. 通知データを作成
+    // ==========================================
+    const notifications = followerIds.map(userId => ({
+      user_id: userId,
+      actor_id: currentUser.id,
+      type: "post",
+      post_id: postId
+    }));
+
+    // ==========================================
+    // 4. Supabaseに一括保存
+    // ==========================================
+    const { error: notificationError } =
+      await supabaseClient
+        .from("notifications")
+        .insert(notifications);
+
+    if (notificationError) {
+      console.error(
+        "notifyFollowersAboutPost: 通知保存失敗",
+        notificationError
+      );
+    }
+
+    // ==========================================
+    // 5. MQTTで各フォロワーへリアルタイム通知
+    // ==========================================
+    for (const followerId of followerIds) {
+      mqttPublish(
+        mqttTopicUser(followerId),
+        {
+          type: "post_created",
+          post_id: postId,
+          user_id: currentUser.id
+        }
+      );
+    }
+
+    console.log(
+      `投稿通知送信完了: ${followerIds.length}人`,
+      {
+        postId,
+        userId: currentUser.id,
+        followerIds
+      }
+    );
+
+  } catch (error) {
+    console.error(
+      "notifyFollowersAboutPost: 予期しないエラー",
+      error
+    );
+  }
+}
 
 
 async function createNotificationForPost(
   postId,
   type
-){
+) {
+  const post =
+    cache.posts.get(postId);
 
-  const {data:post,error} =
-    await supabaseClient
-      .from("posts")
-      .select("user_id")
-      .eq("id",postId)
-      .maybeSingle();
+  let targetUserId =
+    post?.user_id;
 
-  if(error || !post) return;
+  if (!targetUserId) {
+    const { data } =
+      await supabaseClient
+        .from("posts")
+        .select("user_id")
+        .eq("id", postId)
+        .maybeSingle();
 
-  // 自分の投稿には通知しない
-  if(post.user_id === currentUser.id)
+    targetUserId =
+      data?.user_id;
+  }
+
+  if (!targetUserId) return;
+
+  if (
+    targetUserId ===
+    currentUser.id
+  ) {
     return;
+  }
 
   await createNotification({
-
-    user_id:post.user_id,
-
-    actor_id:currentUser.id,
-
+    user_id: targetUserId,
+    actor_id: currentUser.id,
     type,
-
-    post_id:postId
-
+    post_id: postId
   });
-
 }
 
 
+async function createNotification(
+  notification
+) {
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("notifications")
+    .insert(notification)
+    .select("id")
+    .single();
 
-async function loadNotifications(){
+  if (error) {
+    console.error(
+      "notification:",
+      error
+    );
 
+    return null;
+  }
+
+  /*
+   * 20件を超えた時だけ古い通知を削除。
+   */
+  const {
+    data: notifications
+  } = await supabaseClient
+    .from("notifications")
+    .select("id")
+    .eq(
+      "user_id",
+      notification.user_id
+    )
+    .order("created_at", {
+      ascending: false
+    })
+    .range(20, 100);
+
+  const oldIds =
+    (notifications || [])
+      .map(x => x.id);
+
+  if (oldIds.length) {
+    await supabaseClient
+      .from("notifications")
+      .delete()
+      .in("id", oldIds);
+  }
+
+  return data;
+}
+
+
+async function loadNotifications() {
   const box =
     $("notifications");
 
   box.innerHTML =
-    `<div class="empty">読み込み中...</div>`;
+    `<div class="empty">
+      読み込み中...
+    </div>`;
 
-  const {data,error} =
-    await supabaseClient
-      .from("notifications")
-      .select("*")
-      .eq(
-        "user_id",
-        currentUser.id
-      )
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(100);
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("notifications")
+    .select(`
+      id,
+      user_id,
+      actor_id,
+      type,
+      post_id,
+      message_id,
+      created_at
+    `)
+    .eq(
+      "user_id",
+      currentUser.id
+    )
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(50);
 
-  if(error){
-
+  if (error) {
     console.error(error);
 
     box.innerHTML =
-      `<div class="empty">取得失敗</div>`;
+      `<div class="empty">
+        取得失敗
+      </div>`;
 
     return;
   }
 
+  if (!data?.length) {
+    box.innerHTML =
+      `<div class="empty">
+        通知はありません
+      </div>`;
+
+    return;
+  }
+
+  /*
+   * actorを一括取得
+   */
+  const actors =
+    await getUsers(
+      data.map(n => n.actor_id)
+    );
+
+  const actorMap =
+    new Map(
+      actors.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  /*
+   * DM通知だけmessageを一括取得
+   */
+  const messageIds =
+    data
+      .filter(n =>
+        n.type === "message" &&
+        n.message_id
+      )
+      .map(n => n.message_id);
+
+  let messageMap =
+    new Map();
+
+  if (messageIds.length) {
+    const {
+      data: messages
+    } = await supabaseClient
+      .from("messages")
+      .select(`
+        id,
+        content
+      `)
+      .in("id", messageIds);
+
+    messageMap =
+      new Map(
+        (messages || []).map(
+          message => [
+            message.id,
+            message
+          ]
+        )
+      );
+  }
+
   box.innerHTML = "";
 
-  for(const n of data || []){
-
+  for (const n of data) {
     const actor =
-      await getUser(n.actor_id);
+      actorMap.get(n.actor_id);
 
-    /*
-     * =========================
-     * DM通知
-     * =========================
-     */
-
-    if(n.type === "message"){
-
-      let message = null;
-
-      if(n.message_id){
-
-        const {data:messageData} =
-          await supabaseClient
-            .from("messages")
-            .select("*")
-            .eq(
-              "id",
-              n.message_id
-            )
-            .maybeSingle();
-
-        message = messageData;
-
-      }
+    if (n.type === "message") {
+      const message =
+        messageMap.get(
+          n.message_id
+        );
 
       const notification =
         document.createElement("div");
@@ -3008,17 +3710,19 @@ async function loadNotifications(){
         "notification";
 
       notification.innerHTML = `
-
         <div
-          style="
-            cursor:pointer;
+          style="cursor:pointer"
+          onclick="
+            openDMFromNotification(
+              '${actor?.id || ""}'
+            )
           "
-          onclick="openDMFromNotification('${actor?.id || ""}')"
         >
 
           <b>
             ${escapeHTML(
-              actor?.username || "ユーザー"
+              actor?.username ||
+              "ユーザー"
             )}
           </b>
 
@@ -3028,21 +3732,21 @@ async function loadNotifications(){
 
           ${
             message
-            ?
-            `
-            <div
-              style="
-                margin-top:6px;
-                padding:10px;
-                background:#f5f8fa;
-                border-radius:10px;
-              "
-            >
-              ${escapeHTML(message.content)}
-            </div>
-            `
-            :
-            ""
+              ? `
+                <div
+                  style="
+                    margin-top:6px;
+                    padding:10px;
+                    background:#f5f8fa;
+                    border-radius:10px;
+                  "
+                >
+                  ${escapeHTML(
+                    message.content
+                  )}
+                </div>
+              `
+              : ""
           }
 
           <div class="handle">
@@ -3050,7 +3754,6 @@ async function loadNotifications(){
           </div>
 
         </div>
-
       `;
 
       box.appendChild(
@@ -3060,170 +3763,471 @@ async function loadNotifications(){
       continue;
     }
 
-    /*
-     * =========================
-     * 通常通知
-     * =========================
-     */
-
+        
+    
     let text = "通知";
-
-    if(n.type === "like")
-      text =
-        "あなたの投稿にいいねしました";
-
-    if(n.type === "reply")
-      text =
-        "あなたの投稿に返信しました";
-
-    if(n.type === "repost")
-      text =
-        "あなたの投稿をリポストしました";
-
-    if(n.type === "follow")
-      text =
-        "あなたをフォローしました";
     
-    const notification =
-      document.createElement("div");
+    if (n.type === "like") {
+      text = "あなたの投稿にいいねしました";
+    }
     
-    notification.className =
-      "notification";
+    if (n.type === "reply") {
+      text = "あなたの投稿に返信しました";
+    }
+    
+    if (n.type === "repost") {
+      text = "あなたの投稿をリポストしました";
+    }
+    
+    if (n.type === "follow") {
+      text = "あなたをフォローしました";
+    }
+    
+    if (n.type === "post") {
+      text = "新しい投稿をしました";
+    }
+    
+    const notification = document.createElement("div");
+    notification.className = "notification";
     
     const clickable =
-      n.type === "reply" && n.post_id;
+      (n.type === "reply" || n.type === "post") && n.post_id;
     
     notification.innerHTML = `
-    
       <div
-        ${
-          clickable
-          ?
-          `
-          style="cursor:pointer"
-          onclick="openReplyFromNotification('${n.post_id}')"
-          `
-          :
-          ""
-        }
+        ${clickable
+          ? `style="cursor:pointer"
+             onclick="openReplyFromNotification('${n.post_id}')"`
+          : ""}
       >
-    
-        <b>
-          ${escapeHTML(
-            actor?.username || "ユーザー"
-          )}
-        </b>
-    
-        ${text}
+        <b>${escapeHTML(actor?.username || "ユーザー")}</b>
+        ${escapeHTML(text)}
     
         <div class="handle">
           ${formatDate(n.created_at)}
         </div>
-    
       </div>
-    
     `;
     
     box.appendChild(notification);
 
 
   }
-
 }
 
 
-/* =========================
+/* =========================================================
    DM
-========================= */
+   ========================================================= */
 
+function mqttTopicUser(userId) {
+    return `chanpro-post/user/${userId}`;
+}
 
-async function loadDMs(){
+function mqttTopicGlobal() {
+    return "chanpro-post/global";
+}
 
-  const box =
-    $("dmContent");
+function connectMQTT() {
+    if (!currentUser) return;
+
+    // 既存接続があれば終了
+    if (mqttClient) {
+        try {
+            mqttClient.end(true);
+        } catch {}
+        mqttClient = null;
+    }
+
+    const clientId =
+        `chanpro-post-${currentUser.id}-${Date.now()}-${Math.random()
+            .toString(16)
+            .slice(2)}`;
+
+    mqttClient = mqtt.connect(MQTT_BROKER, {
+        clientId,
+        clean: true,
+        reconnectPeriod: 3000,
+        connectTimeout: 10000
+    });
+
+    mqttClient.on("connect", () => {
+        console.log("MQTT接続成功");
+
+        // 自分宛てのイベント
+        mqttClient.subscribe(
+            mqttTopicUser(currentUser.id),
+            { qos: 0 },
+            (error) => {
+                if (error) {
+                    console.error("MQTT subscribe user:", error);
+                } else {
+                    console.log(
+                        "MQTT購読:",
+                        mqttTopicUser(currentUser.id)
+                    );
+                }
+            }
+        );
+
+        // 投稿・いいね等の全体イベント
+        mqttClient.subscribe(
+            mqttTopicGlobal(),
+            { qos: 0 },
+            (error) => {
+                if (error) {
+                    console.error("MQTT subscribe global:", error);
+                } else {
+                    console.log(
+                        "MQTT購読:",
+                        mqttTopicGlobal()
+                    );
+                }
+            }
+        );
+    });
+
+    mqttClient.on("reconnect", () => {
+        console.log("MQTT再接続中...");
+    });
+
+    mqttClient.on("error", (error) => {
+        console.error("MQTT error:", error);
+    });
+
+    mqttClient.on("offline", () => {
+        console.log("MQTT offline");
+    });
+
+    mqttClient.on("message", async (topic, payload) => {
+        try {
+            const event = JSON.parse(payload.toString());
+
+            console.log("MQTT受信:", topic, event);
+
+            await handleMQTTEvent(event);
+        } catch (error) {
+            console.error("MQTT message error:", error);
+        }
+    });
+}
+
+function mqttPublish(topic, event) {
+    if (!mqttClient) return;
+
+    if (!mqttClient.connected) {
+        console.log("MQTT未接続のため送信をスキップ");
+        return;
+    }
+
+    mqttClient.publish(
+        topic,
+        JSON.stringify(event),
+        {
+            qos: 0,
+            retain: false
+        }
+    );
+}
+
+async function handleMQTTEvent(event) {
+    if (!currentUser) return;
+
+    // =========================
+    // DM
+    // =========================
+    if (event.type === "message") {
+        if (!event.message_id) return;
+
+        // 自分が送ったDMは無視
+        if (event.sender_id === currentUser.id) {
+            return;
+        }
+
+        // 自分宛てでなければ無視
+        if (event.receiver_id !== currentUser.id) {
+            return;
+        }
+
+        // 現在開いているDMの相手から届いた場合
+        if (
+            currentDMUser &&
+            currentDMUser.id === event.sender_id &&
+            $("dmMessages")
+        ) {
+            const { data: message, error } =
+                await supabaseClient
+                    .from("messages")
+                    .select(`
+                        id,
+                        sender_id,
+                        receiver_id,
+                        content,
+                        created_at
+                    `)
+                    .eq("id", event.message_id)
+                    .maybeSingle();
+
+            if (error) {
+                console.error("DM取得:", error);
+                return;
+            }
+
+            if (!message) return;
+
+            // 重複表示防止
+            const exists = document.querySelector(
+                `[data-dm-message-id="${message.id}"]`
+            );
+
+            if (exists) return;
+
+            appendDMMessage(message);
+
+            const messagesBox = $("dmMessages");
+
+            if (messagesBox) {
+                messagesBox.scrollTop =
+                    messagesBox.scrollHeight;
+            }
+
+            toast("新しいDM");
+        }
+
+        // DM一覧なら即更新
+        if (
+            !$("messagesPage")
+                .classList
+                .contains("hidden") &&
+            !currentDMUser
+        ) {
+            await loadDMs();
+        }
+
+        return;
+    }
+
+    // =========================
+    // 新規投稿
+    // =========================
+    if (event.type === "post_created") {
+        if (
+            !$("homePage")
+                .classList
+                .contains("hidden")
+        ) {
+            await loadHome();
+        }
+
+        return;
+    }
+
+    // =========================
+    // 投稿削除
+    // =========================
+    if (event.type === "post_deleted") {
+        cache.posts.delete(event.post_id);
+
+        if (
+            !$("homePage")
+                .classList
+                .contains("hidden")
+        ) {
+            await loadHome();
+        }
+
+        return;
+    }
+
+    // =========================
+    // フォロー
+    // =========================
+    if (event.type === "follow") {
+        cache.suggestedUsers = null;
+
+        if (
+            !$("profilePage")
+                .classList
+                .contains("hidden")
+        ) {
+            await showUserProfile(currentUser.id);
+        }
+
+        return;
+    }
+
+    // =========================
+    // いいね・リポスト
+    // =========================
+    if (
+        event.type === "like" ||
+        event.type === "repost"
+    ) {
+        if (
+            !$("homePage")
+                .classList
+                .contains("hidden")
+        ) {
+            await loadHome();
+        }
+
+        return;
+    }
+}
+
+function subscribeDMRealtime() {
+    if (dmChannel) {
+        supabaseClient.removeChannel(dmChannel);
+        dmChannel = null;
+    }
+
+    if (!currentUser) return;
+
+    dmChannel = supabaseClient
+        .channel(`dm-realtime-${currentUser.id}`)
+        .on(
+            "postgres_changes",
+            {
+                event: "INSERT",
+                schema: "public",
+                table: "messages",
+                filter: `receiver_id=eq.${currentUser.id}`
+            },
+            async (payload) => {
+                const message = payload.new;
+
+                // DM画面を開いている相手からのメッセージなら即表示
+                if (
+                    currentDMUser &&
+                    message.sender_id === currentDMUser.id &&
+                    $("dmMessages")
+                ) {
+                    appendDMMessage(message);
+
+                    const messagesBox = $("dmMessages");
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                }
+
+                // DM一覧を開いている場合は更新
+                if (
+                    !$("messagesPage").classList.contains("hidden") &&
+                    !currentDMUser
+                ) {
+                    await loadDMs();
+                }
+
+                // 通知ページを開いている場合も更新
+                if (
+                    !$("notificationPage").classList.contains("hidden")
+                ) {
+                    await loadNotifications();
+                }
+            }
+        )
+        .subscribe((status) => {
+            console.log("DM Realtime:", status);
+        });
+}
+
+async function loadDMs() {
+  currentDMUser = null;
+
+  const box=$("dmContent");
 
   box.innerHTML =
-    `<div class="empty">DM一覧を読み込み中...</div>`;
+    `<div class="empty">
+      DM一覧を読み込み中...
+    </div>`;
 
-  /*
-   * 自分が送ったDM・受け取ったDMを取得
-   */
-  const {data:messages,error} =
-    await supabaseClient
-      .from("messages")
-      .select("*")
-      .or(
-        `sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`
-      )
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(200);
+  const {
+    data: messages,
+    error
+  } = await supabaseClient
+    .from("messages")
+    .select(`
+      id,
+      sender_id,
+      receiver_id,
+      content,
+      created_at
+    `)
+    .or(
+      `sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`
+    )
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(200);
 
-  if(error){
-
+  if (error) {
     console.error(error);
 
     box.innerHTML =
-      `<div class="empty">DM一覧を取得できませんでした</div>`;
+      `<div class="empty">
+        DM一覧を取得できませんでした
+      </div>`;
 
     return;
   }
 
-  /*
-   * 相手ごとに最新のDMだけ残す
-   */
   const conversations =
     new Map();
 
-  for(const message of messages || []){
-
+  for (const message of messages || []) {
     const otherUserId =
-      message.sender_id === currentUser.id
+      message.sender_id ===
+      currentUser.id
         ? message.receiver_id
         : message.sender_id;
 
-    if(!otherUserId) continue;
+    if (!otherUserId) continue;
 
-    /*
-     * すでに最新DMが入っていれば追加しない
-     */
-    if(!conversations.has(otherUserId)){
-
+    if (
+      !conversations.has(
+        otherUserId
+      )
+    ) {
       conversations.set(
         otherUserId,
         message
       );
-
     }
-
   }
 
-  box.innerHTML = "";
-
-  if(conversations.size === 0){
-
-    box.innerHTML = `
-      <div class="empty">
+  if (!conversations.size) {
+    box.innerHTML =
+      `<div class="empty">
         まだDMはありません
-      </div>
-    `;
+      </div>`;
 
     return;
   }
 
-  /*
-   * DM一覧
-   */
-  for(
-    const [userId,message]
-    of conversations
-  ){
+  const users =
+    await getUsers(
+      [...conversations.keys()]
+    );
 
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
+
+  box.innerHTML = "";
+
+  for (
+    const [
+      userId,
+      message
+    ] of conversations
+  ) {
     const user =
-      await getUser(userId);
+      userMap.get(userId);
 
-    if(!user) continue;
+    if (!user) continue;
 
     const row =
       document.createElement("div");
@@ -3235,7 +4239,6 @@ async function loadDMs(){
       "pointer";
 
     row.innerHTML = `
-
       <img
         class="avatar"
         src="${avatarURL(
@@ -3248,9 +4251,10 @@ async function loadDMs(){
         class="userRowInfo"
         style="flex:1"
       >
-
         <b>
-          ${escapeHTML(user.username)}
+          ${escapeHTML(
+            user.username
+          )}
         </b>
 
         <div
@@ -3275,166 +4279,74 @@ async function loadDMs(){
             message.created_at
           )}
         </div>
-
       </div>
-
     `;
 
-    /*
-     * 行をクリック → DM画面
-     */
-    row.onclick = () => {
-
+    row.onclick = () =>
       openDM(user.id);
 
-    };
-
     box.appendChild(row);
-
   }
-
 }
 
 
-async function openDM(userId){
-
-  /*
-   * =========================
-   * 相手ユーザー取得
-   * =========================
-   */
-
+async function openDM(userId) {
   const user =
     await getUser(userId);
 
-  if(!user){
-
+  if (!user) {
     toast("ユーザーが見つかりません");
-
     return;
   }
 
-  /*
-   * 現在のDM相手を保存
-   */
-
   currentDMUser =
     user;
-
-  /*
-   * =========================
-   * DMページ表示
-   * =========================
-   */
 
   hidePages();
 
   $("messagesPage")
     .classList.remove("hidden");
 
-  /*
-   * 読み込み中
-   */
-
   $("dmContent").innerHTML = `
-
-    <div class="pageHeader">
-
-      <span
-        style="
-          cursor:pointer;
-          display:inline-flex;
-          align-items:center;
-          gap:8px;
-        "
-        onclick="showUserProfile('${user.id}')"
-      >
-
-        <img
-          class="avatar"
-          src="${avatarURL(
-            user.icon_url,
-            40
-          )}"
-          style="
-            width:40px;
-            height:40px;
-          "
-        >
-
-        <span>
-          ${escapeHTML(user.username)}
-        </span>
-
-      </span>
-
-    </div>
-
-    <div
-      class="empty"
-      style="padding:30px"
-    >
+    <div class="empty">
       DMを読み込み中...
     </div>
-
   `;
 
-  /*
-   * =========================
-   * DM取得
-   * =========================
-   */
+  const {
+    data: messages,
+    error
+  } = await supabaseClient
+    .from("messages")
+    .select(`
+      id,
+      sender_id,
+      receiver_id,
+      content,
+      created_at
+    `)
+    .or(
+      `and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`
+    )
+    .order("created_at", {
+      ascending: true
+    });
 
-  const {data:messages,error} =
-    await supabaseClient
-      .from("messages")
-      .select("*")
-      .or(
-        `and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`
-      )
-      .order("created_at",{
-        ascending:true
-      });
-
-  if(error){
-
+  if (error) {
     console.error(
       "DM取得エラー:",
       error
     );
 
-    $("dmContent").innerHTML = `
-
-      <div class="pageHeader">
-
-        <span
-          style="
-            cursor:pointer;
-          "
-          onclick="showUserProfile('${user.id}')"
-        >
-          ${escapeHTML(user.username)}
-        </span>
-
-      </div>
-
-      <div class="empty">
+    $("dmContent").innerHTML =
+      `<div class="empty">
         DMを取得できませんでした
-      </div>
-
-    `;
+      </div>`;
 
     return;
   }
 
-  /*
-   * =========================
-   * DM画面
-   * =========================
-   */
-
   $("dmContent").innerHTML = `
-
     <div
       class="pageHeader"
       style="
@@ -3447,9 +4359,7 @@ async function openDM(userId){
       <button
         class="secondary"
         onclick="loadDMs()"
-        style="
-          padding:6px 10px;
-        "
+        style="padding:6px 10px"
       >
         ←
       </button>
@@ -3478,24 +4388,24 @@ async function openDM(userId){
         >
 
         <div>
-
           <b>
-            ${escapeHTML(user.username)}
+            ${escapeHTML(
+              user.username
+            )}
           </b>
 
           <div
             class="handle"
             style="font-size:12px"
           >
-            @${escapeHTML(user.username)}
+            @${escapeHTML(
+              user.username
+            )}
           </div>
-
         </div>
 
       </div>
-
     </div>
-
 
     <div
       id="dmMessages"
@@ -3507,7 +4417,6 @@ async function openDM(userId){
         padding:15px;
       "
     ></div>
-
 
     <div
       style="
@@ -3550,22 +4459,13 @@ async function openDM(userId){
       </button>
 
     </div>
-
   `;
-
-  /*
-   * =========================
-   * メッセージ表示
-   * =========================
-   */
 
   const messagesBox =
     $("dmMessages");
 
-  if(!messages || !messages.length){
-
+  if (!messages?.length) {
     messagesBox.innerHTML = `
-
       <div
         class="empty"
         style="
@@ -3573,7 +4473,10 @@ async function openDM(userId){
           text-align:center;
         "
       >
-        まだメッセージはありません<br>
+        まだメッセージはありません
+
+        <br>
+
         <span
           style="
             font-size:13px;
@@ -3583,178 +4486,45 @@ async function openDM(userId){
           最初のメッセージを送ってみましょう
         </span>
       </div>
-
     `;
-
-  }else{
-
-    messagesBox.innerHTML = "";
-
-    for(const message of messages){
-
-      const div =
-        document.createElement("div");
-
-      const isMine =
-        message.sender_id === currentUser.id;
-
-      div.className =
-        "dmMessage " +
-        (
-          isMine
-            ? "me"
-            : ""
-        );
-
-      /*
-       * 自分 / 相手で見た目を分ける
-       */
-
-      div.style.display =
-        "flex";
-
-      div.style.flexDirection =
-        "column";
-
-      div.style.alignItems =
-        isMine
-          ? "flex-end"
-          : "flex-start";
-
-      div.style.marginBottom =
-        "10px";
-
-      /*
-       * メッセージ本文
-       */
-
-      const messageBubble =
-        document.createElement("div");
-
-      messageBubble.textContent =
-        message.content || "";
-
-      messageBubble.style.maxWidth =
-        "75%";
-
-      messageBubble.style.padding =
-        "9px 13px";
-
-      messageBubble.style.borderRadius =
-        "18px";
-
-      messageBubble.style.wordBreak =
-        "break-word";
-
-      messageBubble.style.whiteSpace =
-        "pre-wrap";
-
-      if(isMine){
-
-        messageBubble.style.background =
-          "#1d9bf0";
-
-        messageBubble.style.color =
-          "#fff";
-
-      }else{
-
-        messageBubble.style.background =
-          "#eff3f4";
-
-        messageBubble.style.color =
-          "#0f1419";
-
-      }
-
-      /*
-       * 時刻
-       */
-
-      const time =
-        document.createElement("div");
-
-      time.className =
-        "handle";
-
-      time.style.fontSize =
-        "11px";
-
-      time.style.marginTop =
-        "3px";
-
-      time.textContent =
-        formatDate(
-          message.created_at
-        );
-
-      div.appendChild(
-        messageBubble
+  } else {
+    for (const message of messages) {
+      appendDMMessage(
+        message
       );
-
-      div.appendChild(
-        time
-      );
-
-      messagesBox.appendChild(
-        div
-      );
-
     }
-
   }
-
-  /*
-   * =========================
-   * 一番下までスクロール
-   * =========================
-   */
 
   messagesBox.scrollTop =
     messagesBox.scrollHeight;
 
-  /*
-   * =========================
-   * 入力欄にフォーカス
-   * =========================
-   */
-
-  const input =
-    $("dmInput");
-
-  if(input){
-
-    setTimeout(() => {
-
-      input.focus();
-
-    },100);
-
-  }
-
+  setTimeout(() => {
+    $("dmInput")?.focus();
+  }, 100);
 }
 
 
-function appendDMMessage(message){
+function appendDMMessage(message) {
+    const messagesBox = $("dmMessages");
+    if (!messagesBox) return;
 
-  const messagesBox =
-    $("dmMessages");
+    // 同じメッセージを二重表示しない
+    if (message.id) {
+        const existing = document.querySelector(
+            `[data-dm-message-id="${message.id}"]`
+        );
 
-  if(!messagesBox)
-    return;
+        if (existing) return;
+    }
 
-  const div =
-    document.createElement("div");
+    const isMine =
+        message.sender_id === currentUser.id;
 
-  div.className =
-    "dmMessage " +
-    (
-      message.sender_id === currentUser.id
-      ?
-      "me"
-      :
-      ""
-    );
+    const div = document.createElement("div");
+
+    if (message.id) {
+        div.dataset.dmMessageId = message.id;
+    }
 
   div.style.cssText = `
     margin:6px 0;
@@ -3765,19 +4535,17 @@ function appendDMMessage(message){
     white-space:pre-wrap;
     word-break:break-word;
     ${
-      message.sender_id === currentUser.id
-      ?
-      `
-      margin-left:auto;
-      background:#1d9bf0;
-      color:white;
-      `
-      :
-      `
-      margin-right:auto;
-      background:#eff3f4;
-      color:#0f1419;
-      `
+      isMine
+        ? `
+          margin-left:auto;
+          background:#1d9bf0;
+          color:white;
+        `
+        : `
+          margin-right:auto;
+          background:#eff3f4;
+          color:#0f1419;
+        `
     }
   `;
 
@@ -3785,347 +4553,460 @@ function appendDMMessage(message){
     message.content;
 
   messagesBox.appendChild(div);
-
 }
 
 
+async function sendDM() {
+    if (!currentDMUser) return;
 
-async function sendDM(){
+    const input = $("dmInput");
+    const content = input.value.trim();
 
-  if(!currentDMUser) return;
+    if (!content) return;
 
-  const input = $("dmInput");
+    const { data: message, error } =
+        await supabaseClient
+            .from("messages")
+            .insert({
+                sender_id: currentUser.id,
+                receiver_id: currentDMUser.id,
+                content
+            })
+            .select(`
+                id,
+                sender_id,
+                receiver_id,
+                content,
+                created_at
+            `)
+            .single();
 
-  const content =
-    input.value.trim();
+    if (error) {
+        console.error(error);
+        toast("DM送信失敗");
+        return;
+    }
 
-  if(!content) return;
+    // 自分の画面には即表示
+    appendDMMessage(message);
 
-  const {data:message,error} =
-    await supabaseClient
-      .from("messages")
-      .insert({
+    // 相手へMQTT通知
+    mqttPublish(
+        mqttTopicUser(currentDMUser.id),
+        {
+            type: "message",
+            message_id: message.id,
+            sender_id: currentUser.id,
+            receiver_id: currentDMUser.id
+        }
+    );
 
-        sender_id:currentUser.id,
-        receiver_id:currentDMUser.id,
-        content
+    // 通知もDBに保存
+    if (currentDMUser.id !== currentUser.id) {
+        await supabaseClient
+            .from("notifications")
+            .insert({
+                user_id: currentDMUser.id,
+                actor_id: currentUser.id,
+                type: "message",
+                message_id: message.id
+            });
+    }
 
-      })
-      .select("*")
-      .single();
+    input.value = "";
 
-  if(error){
+    const messagesBox = $("dmMessages");
 
+    if (messagesBox) {
+        messagesBox.scrollTop =
+            messagesBox.scrollHeight;
+    }
+}
+
+
+/* =========================================================
+   Trends
+   ========================================================= */
+
+async function loadTrends() {
+  const box =
+    $("trends");
+
+  /*
+   * ログイン中に何度も取得しない。
+   */
+  if (cache.trends) {
+    renderTrends(
+      cache.trends
+    );
+    return;
+  }
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("post_hashtags")
+    .select("hashtag")
+    .limit(1000);
+
+  if (error) {
     console.error(error);
 
-    toast("DM送信失敗");
+    box.innerHTML =
+      `<div class="empty">
+        トレンドを取得できませんでした
+      </div>`;
 
     return;
   }
 
-  /*
-   * DM通知
-   */
-  if(currentDMUser.id !== currentUser.id){
+  const counts =
+    new Map();
 
-    const {error:notificationError} =
-      await supabaseClient
-        .from("notifications")
-        .insert({
-
-          user_id:currentDMUser.id,
-          actor_id:currentUser.id,
-          type:"message",
-          message_id:message.id
-
-        });
-
-    if(notificationError){
-
-      console.error(
-        "DM通知作成失敗",
-        notificationError
-      );
-
-    }
-
+  for (const row of data || []) {
+    counts.set(
+      row.hashtag,
+      (counts.get(row.hashtag) || 0) + 1
+    );
   }
 
-  input.value = "";
+  const trends =
+    [...counts.entries()]
+      .map(([tag, count]) => ({
+        tag,
+        count
+      }))
+      .sort(
+        (a, b) =>
+          b.count - a.count
+      )
+      .slice(0, 3);
 
-  await openDM(
-    currentDMUser.id
+  cache.trends =
+    trends;
+
+  renderTrends(
+    trends
   );
-
 }
 
 
-
-/* =========================
-   トレンド
-========================= */
-
-async function loadTrends(){
-
-  const {data} =
-    await supabaseClient
-      .from("hashtags")
-      .select("*")
-      .order("usage_count",{
-        ascending:false
-      })
-      .limit(10);
-
+function renderTrends(trends) {
   const box =
     $("trends");
 
-  box.innerHTML="";
+  box.innerHTML = "";
 
-  for(const tag of data || []){
+  if (!trends?.length) {
+    box.innerHTML =
+      `<div class="empty">
+        まだトレンドがありません
+      </div>`;
 
-    box.innerHTML += `
-
-      <div
-        class="trend"
-        onclick="searchHashtag('${escapeHTML(tag.tag)}')"
-      >
-
-        <b>#${escapeHTML(tag.tag)}</b>
-
-        <small>
-          ${tag.usage_count || 0}件の投稿
-        </small>
-
-      </div>
-
-    `;
-
+    return;
   }
 
+  for (const trend of trends) {
+    const row =
+      document.createElement("div");
+
+    row.className =
+      "trend";
+
+    row.innerHTML = `
+      <b>
+        #${escapeHTML(
+          trend.tag
+        )}
+      </b>
+
+      <small>
+        ${trend.count}件の投稿
+      </small>
+    `;
+
+    row.onclick = () =>
+      searchHashtag(
+        trend.tag
+      );
+
+    box.appendChild(row);
+  }
 }
 
 
-/* =========================
-   おすすめ
-========================= */
+/* =========================================================
+   Suggested users
+   ========================================================= */
 
-async function loadSuggestedUsers(){
-
-  const {data} =
-    await supabaseClient
-      .from("users")
-      .select("*")
-      .neq("id", currentUser.id)
-      .limit(5);
-
+async function loadSuggestedUsers() {
   const box =
     $("suggestedUsers");
 
+  const {
+    data: users
+  } = await supabaseClient
+    .from("users")
+    .select(`
+      id,
+      username,
+      icon_url
+    `)
+    .neq(
+      "id",
+      currentUser.id
+    )
+    .limit(5);
+
+  if (!users?.length) {
+    box.innerHTML = "";
+    return;
+  }
+
+  /*
+   * 5人それぞれにSELECTするのをやめる。
+   */
+  const {
+    data: follows
+  } = await supabaseClient
+    .from("follows")
+    .select("following_id")
+    .eq(
+      "follower_id",
+      currentUser.id
+    )
+    .in(
+      "following_id",
+      users.map(user => user.id)
+    );
+
+  const followingSet =
+    new Set(
+      (follows || [])
+        .map(x => x.following_id)
+    );
+
   box.innerHTML = "";
 
-  for(const user of data || []){
+  for (const user of users) {
+    cache.users.set(
+      user.id,
+      user
+    );
 
-    const {data:followData} =
-      await supabaseClient
-        .from("follows")
-        .select("id")
-        .eq("follower_id", currentUser.id)
-        .eq("following_id", user.id)
-        .maybeSingle();
-
-    const isFollowing = !!followData;
+    const isFollowing =
+      followingSet.has(
+        user.id
+      );
 
     const row =
       document.createElement("div");
 
-    row.className = "userRow";
+    row.className =
+      "userRow";
 
     row.innerHTML = `
-
       <img
         class="avatar"
-        src="${avatarURL(user.icon_url,45)}"
+        src="${avatarURL(
+          user.icon_url,
+          45
+        )}"
         style="cursor:pointer"
       >
 
       <div
         class="userRowInfo"
-        style="cursor:pointer;flex:1"
+        style="
+          cursor:pointer;
+          flex:1
+        "
       >
-
         <b>
-          ${escapeHTML(user.username)}
+          ${escapeHTML(
+            user.username
+          )}
         </b>
 
         <div class="handle">
-          @${escapeHTML(user.username)}
+          @${escapeHTML(
+            user.username
+          )}
         </div>
-
       </div>
 
       <button
-        class="${isFollowing ? "secondary" : "primary"}"
+        class="${
+          isFollowing
+            ? "secondary"
+            : "primary"
+        }"
       >
-        ${isFollowing ? "フォロー中" : "フォロー"}
+        ${
+          isFollowing
+            ? "フォロー中"
+            : "フォロー"
+        }
       </button>
-
     `;
 
-    // アイコン → プロフィール
-    row.querySelector(".avatar").onclick = () => {
+    row.querySelector(
+      ".avatar"
+    ).onclick = () =>
       showUserProfile(user.id);
-    };
 
-    // 名前 → プロフィール
-    row.querySelector(".userRowInfo").onclick = () => {
+    row.querySelector(
+      ".userRowInfo"
+    ).onclick = () =>
       showUserProfile(user.id);
-    };
 
-    // フォローボタン
-    row.querySelector("button").onclick = async () => {
+    row.querySelector(
+      "button"
+    ).onclick = async () => {
+      await toggleFollow(
+        user.id,
+        false
+      );
 
-      await toggleFollow(user.id);
-
-      // フォロー状態を更新
       await loadSuggestedUsers();
-
     };
 
     box.appendChild(row);
-
   }
-
 }
 
 
-/* =========================
-   通報
-========================= */
+/* =========================================================
+   Reports
+   ========================================================= */
 
 async function reportPost(
   postId,
   userId
-){
-
+) {
   const reason =
     prompt(
       "通報理由を入力してください"
     );
 
-  if(!reason) return;
+  if (!reason) return;
 
-  const {error} =
-    await supabaseClient
-      .from("reports")
-      .insert({
+  const {
+    error
+  } = await supabaseClient
+    .from("reports")
+    .insert({
+      reporter_id:
+        currentUser.id,
+      target_user_id:
+        userId,
+      post_id:
+        postId,
+      reason
+    });
 
-        reporter_id:currentUser.id,
-        target_user_id:userId,
-        post_id:postId,
-        reason
-
-      });
-
-  if(error){
-
+  if (error) {
     console.error(error);
     toast("通報できませんでした");
-
     return;
   }
 
   toast("通報しました");
-
 }
 
 
-/* =========================
-   管理者
-========================= */
+/* =========================================================
+   Admin
+   ========================================================= */
 
-async function checkAdmin(){
+/*
+ * is_admin は完全に使用しない。
+ *
+ * users.role === "admin"
+ * のみを使用。
+ */
+function checkAdmin() {
+  const isAdmin =
+    currentUser?.role === "admin";
 
-  if(
-    currentUser.role === "admin" ||
-    currentUser.is_admin === true
-  ){
-
-    $("adminNav")
-      .classList.remove("hidden");
-
-  }else{
-
-    $("adminNav")
-      .classList.add("hidden");
-
-  }
-
+  $("adminNav")
+    .classList.toggle(
+      "hidden",
+      !isAdmin
+    );
 }
 
 
-async function loadAdmin(){
-
-  if(
-    currentUser.role !== "admin" &&
-    currentUser.is_admin !== true
-  ){
-
+async function loadAdmin() {
+  if (
+    currentUser?.role !== "admin"
+  ) {
     $("adminContent").innerHTML =
-      `<div class="empty">管理者権限がありません</div>`;
+      `<div class="empty">
+        管理者権限がありません
+      </div>`;
 
     return;
   }
 
-  const {count:userCount} =
-    await supabaseClient
+  const [
+    usersResult,
+    postsResult,
+    reportsResult
+  ] = await Promise.all([
+    supabaseClient
       .from("users")
-      .select("*",{
-        count:"exact",
-        head:true
-      });
+      .select("*", {
+        count: "exact",
+        head: true
+      }),
 
-  const {count:postCount} =
-    await supabaseClient
+    supabaseClient
       .from("posts")
-      .select("*",{
-        count:"exact",
-        head:true
-      });
+      .select("*", {
+        count: "exact",
+        head: true
+      }),
 
-  const {count:reportCount} =
-    await supabaseClient
+    supabaseClient
       .from("reports")
-      .select("*",{
-        count:"exact",
-        head:true
+      .select("*", {
+        count: "exact",
+        head: true
       })
-      .eq("status","open");
+      .eq(
+        "status",
+        "open"
+      )
+  ]);
 
   $("adminContent").innerHTML = `
-
     <div class="admin">
 
-      <h2>管理者ダッシュボード</h2>
+      <h2>
+        管理者ダッシュボード
+      </h2>
 
       <div class="card">
-
         <b>ユーザー</b>
-        <h2>${userCount || 0}</h2>
-
+        <h2>
+          ${usersResult.count || 0}
+        </h2>
       </div>
 
       <div class="card">
-
         <b>投稿</b>
-        <h2>${postCount || 0}</h2>
-
+        <h2>
+          ${postsResult.count || 0}
+        </h2>
       </div>
 
       <div class="card">
-
         <b>未処理通報</b>
-        <h2>${reportCount || 0}</h2>
-
+        <h2>
+          ${reportsResult.count || 0}
+        </h2>
       </div>
 
       <hr>
@@ -4152,25 +5033,28 @@ async function loadAdmin(){
       </button>
 
     </div>
-
   `;
-
 }
 
 
-async function adminUsers(){
-
-  const {data} =
-    await supabaseClient
-      .from("users")
-      .select("*")
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(200);
+async function adminUsers() {
+  const {
+    data
+  } = await supabaseClient
+    .from("users")
+    .select(`
+      id,
+      username,
+      role,
+      created_at,
+      ban_until
+    `)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(200);
 
   $("adminContent").innerHTML = `
-
     <div class="admin">
 
       <h2>ユーザー管理</h2>
@@ -4185,91 +5069,101 @@ async function adminUsers(){
       <div id="adminUserList"></div>
 
     </div>
-
   `;
 
   const box =
     $("adminUserList");
 
-  for(const user of data || []){
-
+  for (const user of data || []) {
     box.innerHTML += `
-
       <div class="adminRow">
 
         <b>
-          ${escapeHTML(user.username)}
+          ${escapeHTML(
+            user.username
+          )}
         </b>
 
         <div class="handle">
           ID: ${user.id}
         </div>
 
-        <div style="margin-top:8px">
+        <div
+          style="margin-top:8px"
+        >
 
           <button
             class="secondary"
-            onclick="adminChangeRole('${user.id}')"
+            onclick="
+              adminChangeRole(
+                '${user.id}'
+              )
+            "
           >
             権限変更
           </button>
 
           <button
             class="danger"
-            onclick="adminBan('${user.id}')"
+            onclick="
+              adminBan(
+                '${user.id}'
+              )
+            "
           >
             BAN
           </button>
 
           <button
             class="danger"
-            onclick="adminDeleteUser('${user.id}')"
+            onclick="
+              adminDeleteUser(
+                '${user.id}'
+              )
+            "
           >
             削除
           </button>
 
         </div>
-
       </div>
-
     `;
-
   }
-
 }
 
 
-async function adminChangeRole(userId){
-
+async function adminChangeRole(userId) {
   const role =
     prompt(
       "権限を入力：admin または user"
     );
 
-  if(
+  if (
     role !== "admin" &&
     role !== "user"
-  ){
-
+  ) {
     return;
   }
 
-  await supabaseClient
+  const {
+    error
+  } = await supabaseClient
     .from("users")
-    .update({
-      role
-    })
-    .eq("id",userId);
+    .update({ role })
+    .eq("id", userId);
+
+  if (error) {
+    toast("権限変更失敗");
+    return;
+  }
 
   toast("権限を変更しました");
 
   await adminUsers();
-
 }
 
 
-async function adminBan(userId){
-
+async function adminBan(userId) {
   const minutes =
     Number(
       prompt(
@@ -4278,8 +5172,12 @@ async function adminBan(userId){
       )
     );
 
-  if(!minutes || minutes < 1)
+  if (
+    !minutes ||
+    minutes < 1
+  ) {
     return;
+  }
 
   const until =
     new Date(
@@ -4287,70 +5185,89 @@ async function adminBan(userId){
       minutes * 60 * 1000
     ).toISOString();
 
-  const {error} =
-    await supabaseClient
-      .from("users")
-      .update({
-        ban_until:until
-      })
-      .eq("id",userId);
+  const {
+    error
+  } = await supabaseClient
+    .from("users")
+    .update({
+      ban_until: until
+    })
+    .eq("id", userId);
 
-  if(error){
-
+  if (error) {
     console.error(error);
     toast("BAN失敗");
     return;
   }
 
   toast("BANしました");
-
 }
 
 
-async function adminDeleteUser(userId){
-
-  if(
+async function adminDeleteUser(userId) {
+  if (
     !confirm(
       "このユーザーを削除しますか？"
     )
-  ){
-
+  ) {
     return;
   }
 
-  const {error} =
-    await supabaseClient
-      .from("users")
-      .delete()
-      .eq("id",userId);
+  const {
+    error
+  } = await supabaseClient
+    .from("users")
+    .delete()
+    .eq("id", userId);
 
-  if(error){
-
+  if (error) {
     toast("削除失敗");
     console.error(error);
     return;
   }
 
+  cache.users.delete(
+    userId
+  );
+
   toast("ユーザーを削除しました");
 
   await adminUsers();
-
 }
 
 
-async function adminPosts(){
+async function adminPosts() {
+  const {
+    data
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at
+    `)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(200);
 
-  const {data} =
-    await supabaseClient
-      .from("posts")
-      .select("*")
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(200);
+  const users =
+    await getUsers(
+      (data || []).map(
+        post => post.user_id
+      )
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
 
   $("adminContent").innerHTML = `
-
     <div class="admin">
 
       <h2>投稿管理</h2>
@@ -4365,81 +5282,119 @@ async function adminPosts(){
       <div id="adminPostList"></div>
 
     </div>
-
   `;
 
   const box =
     $("adminPostList");
 
-  for(const post of data || []){
-
+  for (const post of data || []) {
     const user =
-      await getUser(post.user_id);
+      userMap.get(
+        post.user_id
+      );
 
     box.innerHTML += `
-
       <div class="adminRow">
 
         <b>
-          ${escapeHTML(user?.username || "")}
+          ${escapeHTML(
+            user?.username || ""
+          )}
         </b>
 
         <div>
-          ${escapeHTML(post.content || "")}
+          ${escapeHTML(
+            post.content || ""
+          )}
         </div>
 
         <button
           class="danger"
-          onclick="adminDeletePost('${post.id}')"
+          onclick="
+            adminDeletePost(
+              '${post.id}'
+            )
+          "
         >
           投稿削除
         </button>
 
       </div>
-
     `;
-
   }
-
 }
 
 
-async function adminDeletePost(postId){
-
-  if(
+async function adminDeletePost(postId) {
+  if (
     !confirm(
       "この投稿を削除しますか？"
     )
-  ){
-
+  ) {
     return;
   }
 
-  await supabaseClient
+  const {
+    error
+  } = await supabaseClient
     .from("posts")
     .delete()
-    .eq("id",postId);
+    .eq("id", postId);
+
+  if (error) {
+    toast("削除失敗");
+    return;
+  }
+
+  cache.posts.delete(
+    postId
+  );
 
   toast("削除しました");
 
   await adminPosts();
-
 }
 
 
-async function adminReports(){
+async function adminReports() {
+  const {
+    data
+  } = await supabaseClient
+    .from("reports")
+    .select(`
+      id,
+      target_user_id,
+      post_id,
+      reason,
+      status,
+      created_at
+    `)
+    .eq(
+      "status",
+      "open"
+    )
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(100);
 
-  const {data} =
-    await supabaseClient
-      .from("reports")
-      .select("*")
-      .eq("status","open")
-      .order("created_at",{
-        ascending:false
-      });
+  const users =
+    await getUsers(
+      (data || []).map(
+        report =>
+          report.target_user_id
+      )
+    );
+
+  const userMap =
+    new Map(
+      users.map(user => [
+        user.id,
+        user
+      ])
+    );
 
   $("adminContent").innerHTML = `
-
     <div class="admin">
 
       <h2>通報管理</h2>
@@ -4454,216 +5409,264 @@ async function adminReports(){
       <div id="adminReportList"></div>
 
     </div>
-
   `;
 
   const box =
     $("adminReportList");
 
-  for(const report of data || []){
+  if (!data?.length) {
+    box.innerHTML =
+      `<div class="empty">
+        未処理の通報はありません
+      </div>`;
 
+    return;
+  }
+
+  for (const report of data) {
     const user =
-      await getUser(
+      userMap.get(
         report.target_user_id
       );
 
     box.innerHTML += `
-
       <div class="adminRow">
 
         <b>
-          対象:
-          ${escapeHTML(user?.username || "不明")}
+          対象：
+          ${escapeHTML(
+            user?.username || "不明"
+          )}
         </b>
 
         <div>
-          ${escapeHTML(report.reason || "")}
+          ${escapeHTML(
+            report.reason || ""
+          )}
         </div>
 
         <div class="handle">
-          ${formatDate(report.created_at)}
+          ${formatDate(
+            report.created_at
+          )}
         </div>
 
         <button
           class="secondary"
-          onclick="resolveReport('${report.id}')"
+          onclick="
+            resolveReport(
+              '${report.id}'
+            )
+          "
         >
           対応済み
         </button>
 
         <button
           class="danger"
-          onclick="adminBan('${report.target_user_id}')"
+          onclick="
+            adminBan(
+              '${report.target_user_id}'
+            )
+          "
         >
           BAN
         </button>
 
       </div>
-
     `;
-
   }
-
 }
 
 
-async function resolveReport(reportId){
-
+async function resolveReport(reportId) {
   await supabaseClient
     .from("reports")
     .update({
-      status:"resolved"
+      status: "resolved"
     })
-    .eq("id",reportId);
-
-  await adminReports();
-
-}
-
-
-/* =========================
-   更新
-========================= */
-
-async function refreshCurrentPage(){
-
-  if(
-    !$("homePage").classList.contains("hidden")
-  ){
-
-    await loadHome();
-
-  }
-
-  if(
-    !$("profilePage").classList.contains("hidden")
-  ){
-
-    await showUserProfile(
-      currentUser.id
+    .eq(
+      "id",
+      reportId
     );
 
-  }
-
+  await adminReports();
 }
-function openDMFromNotification(userId){
 
-  if(!userId) return;
+
+/* =========================================================
+   Notification actions
+   ========================================================= */
+
+function openDMFromNotification(userId) {
+  if (!userId) return;
 
   closeModal();
 
-  hidePages();
-
-  $("messagesPage")
-    .classList.remove("hidden");
-
   openDM(userId);
-
 }
 
-async function openReplyFromNotification(postId){
 
-  if(!postId) return;
+async function openReplyFromNotification(postId) {
+  if (!postId) return;
 
-  const {data:post,error} =
-    await supabaseClient
-      .from("posts")
-      .select("*")
-      .eq("id",postId)
-      .maybeSingle();
+  const {
+    data: post
+  } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .eq("id", postId)
+    .maybeSingle();
 
-  if(error || !post){
-
+  if (!post) {
     toast("投稿が見つかりません");
-
     return;
   }
 
+  cache.posts.set(
+    post.id,
+    post
+  );
+
   await replyPost(postId);
-
 }
 
-/* =========================
-通知を作成
-20件を超えたら古い通知を削除
-========================= */
 
-async function createNotification(notification){
+/* =========================================================
+   Refresh
+   ========================================================= */
 
-  const {data,error} =
-    await supabaseClient
-      .from("notifications")
-      .insert(notification)
-      .select("id")
-      .single();
-
-  if(error){
-
-    console.error(error);
-    return null;
-
+async function refreshCurrentPage() {
+  if (
+    !$("homePage")
+      .classList
+      .contains("hidden")
+  ) {
+    await loadHome();
   }
 
-  // このユーザーの通知を新しい順で取得
-  const {data:notifications,error:listError} =
-    await supabaseClient
-      .from("notifications")
-      .select("id")
-      .eq("user_id",notification.user_id)
-      .order("created_at",{
-        ascending:false
-      });
+  if (
+    !$("profilePage")
+      .classList
+      .contains("hidden")
+  ) {
+    /*
+     * 現在表示中のプロフィールを
+     * 再取得する。
+     */
+    const profileId =
+      currentUser.id;
 
-  if(listError){
-
-    console.error(listError);
-    return data;
-
+    await showUserProfile(
+      profileId
+    );
   }
 
-  // 20件を超えた分を削除
-  if(notifications && notifications.length > 20){
-
-    const oldNotifications =
-      notifications.slice(20);
-
-    const oldIds =
-      oldNotifications.map(
-        notification => notification.id
-      );
-
-    if(oldIds.length){
-
-      const {error:deleteError} =
-        await supabaseClient
-          .from("notifications")
-          .delete()
-          .in("id",oldIds);
-
-      if(deleteError){
-
-        console.error(
-          "古い通知の削除に失敗しました",
-          deleteError
-        );
-
-      }
-
-    }
-
+  if (
+    !$("bookmarksPage")
+      .classList
+      .contains("hidden")
+  ) {
+    await showBookmarks();
   }
-
-  return data;
-
 }
 
-/* =========================
-   初期化
-========================= */
+async function showFollowingLatestPosts() {
+  hidePages();
+
+  $("notificationPage").classList.remove("hidden");
+
+  const box = $("notifications");
+  box.innerHTML = `<div class="empty">読み込み中...</div>`;
+
+  // 自分がフォローしているユーザー
+  const { data: follows, error: followsError } = await supabaseClient
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", currentUser.id);
+
+  if (followsError) {
+    console.error(followsError);
+    box.innerHTML = `<div class="empty">フォロー情報を取得できませんでした</div>`;
+    return;
+  }
+
+  const followingIds = (follows || [])
+    .map(row => row.following_id)
+    .filter(Boolean);
+
+  if (!followingIds.length) {
+    box.innerHTML = `<div class="empty">まだ誰もフォローしていません</div>`;
+    return;
+  }
+
+  // フォロー中ユーザーの最新10件
+  const { data: posts, error: postsError } = await supabaseClient
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      image_url,
+      created_at
+    `)
+    .in("user_id", followingIds)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (postsError) {
+    console.error(postsError);
+    box.innerHTML = `<div class="empty">投稿を取得できませんでした</div>`;
+    return;
+  }
+
+  if (!posts?.length) {
+    box.innerHTML = `<div class="empty">フォローしている人の投稿はまだありません</div>`;
+    return;
+  }
+
+  const users = await getUsers(
+    posts.map(post => post.user_id)
+  );
+
+  const userMap = new Map(
+    users.map(user => [user.id, user])
+  );
+
+  const meta = await getPostMeta(
+    posts.map(post => post.id)
+  );
+
+  box.innerHTML = "";
+
+  for (const post of posts) {
+    const user = userMap.get(post.user_id);
+
+    if (!user) continue;
+
+    cache.posts.set(post.id, post);
+
+    box.appendChild(
+      createPostElement(post, user, meta)
+    );
+  }
+}
+
+
+/* =========================================================
+   Start
+   ========================================================= */
 
 restoreLogin();
 
 </script>
+
 
 </body>
 </html>
