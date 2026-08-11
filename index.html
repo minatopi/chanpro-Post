@@ -1,569 +1,144 @@
-<!-- AIに一気に作ってもらったけど、スゲー -->
 <!doctype html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>chanpro-Post</title>
-
+<link rel="icon" type="image/png" href="https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/4422522/6c28fb79-5ca6-4b57-afa1-9cd0bfa4aef8.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <style>
-*{box-sizing:border-box}
-
-body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:#f7f9fa;
-  color:#0f1419;
-}
-
-button,input,textarea{
-  font:inherit;
-}
-
-button{
-  cursor:pointer;
-}
-
-.hidden{
-  display:none!important;
-}
-
-.app{
-  display:grid;
-  grid-template-columns:260px minmax(0,650px) 320px;
-  max-width:1250px;
-  margin:auto;
-  min-height:100vh;
-}
-
-.sidebar{
-  position:sticky;
-  top:0;
-  height:100vh;
-  padding:20px;
-  border-right:1px solid #e1e8ed;
-  background:#fff;
-}
-
-.logo{
-  font-size:24px;
-  font-weight:800;
-  color:#1d9bf0;
-  margin-bottom:25px;
-}
-
-.nav button{
-  display:block;
-  width:100%;
-  text-align:left;
-  border:0;
-  background:transparent;
-  padding:13px 15px;
-  border-radius:25px;
-  margin:4px 0;
-  font-size:16px;
-}
-
-.nav button:hover{
-  background:#eef7fd;
-}
-
-.postButton{
-  width:100%;
-  border:0;
-  background:#1d9bf0;
-  color:white;
-  padding:13px;
-  border-radius:25px;
-  font-weight:bold;
-  margin-top:20px;
-}
-
-.main{
-  min-width:0;
-  border-right:1px solid #e1e8ed;
-  background:#fff;
-}
-
-.pageHeader{
-  position:sticky;
-  top:0;
-  z-index:10;
-  background:rgba(255,255,255,.94);
-  backdrop-filter:blur(8px);
-  padding:15px;
-  border-bottom:1px solid #e1e8ed;
-  font-weight:800;
-}
-
-.composer{
-  padding:15px;
-  border-bottom:1px solid #e1e8ed;
-}
-
-.composer textarea{
-  width:100%;
-  min-height:90px;
-  border:0;
-  outline:0;
-  resize:none;
-  font-size:18px;
-}
-
-.composer input{
-  width:100%;
-  border:1px solid #cfd9de;
-  border-radius:10px;
-  padding:10px;
-  margin-top:8px;
-}
-
-.composerBottom{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-top:10px;
-}
-
-.primary{
-  background:#1d9bf0;
-  color:#fff;
-  border:0;
-  border-radius:22px;
-  padding:9px 18px;
-  font-weight:bold;
-}
-
-.secondary{
-  background:#fff;
-  color:#0f1419;
-  border:1px solid #cfd9de;
-  border-radius:22px;
-  padding:8px 15px;
-  font-weight:bold;
-}
-
-.danger{
-  background:#f4212e;
-  color:white;
-  border:0;
-  border-radius:20px;
-  padding:8px 15px;
-}
-
-.post{
-  padding:15px;
-  border-bottom:1px solid #e1e8ed;
-  transition:.15s;
-}
-
-.post:hover{
-  background:#fafafa;
-}
-
-.postHead{
-  display:flex;
-  gap:10px;
-}
-
-.avatar{
-  width:45px;
-  height:45px;
-  border-radius:50%;
-  object-fit:cover;
-  background:#ddd;
-}
-
-.postUser{
-  font-weight:700;
-}
-
-.handle{
-  color:#536471;
-  font-size:14px;
-}
-
-.postText{
-  margin:8px 0;
-  white-space:pre-wrap;
-  word-break:break-word;
-}
-
-.postImage{
-  width:100%;
-  max-height:450px;
-  object-fit:cover;
-  border-radius:15px;
-  margin-top:8px;
-  border:1px solid #e1e8ed;
-}
-
-.postActions{
-  display:flex;
-  justify-content:space-between;
-  margin-top:10px;
-  color:#536471;
-}
-
-.action{
-  border:0;
-  background:transparent;
-  color:#536471;
-  padding:6px;
-}
-
-.action:hover{
-  color:#1d9bf0;
-}
-
-.action.liked{
-  color:#f91880;
-}
-
-.action.reposted{
-  color:#00ba7c;
-}
-
-.rightbar{
-  padding:15px;
-}
-
-.search{
-  width:100%;
-  border:0;
-  background:#eff3f4;
-  border-radius:25px;
-  padding:12px 18px;
-  outline:0;
-}
-
-.card{
-  background:#f7f9f9;
-  border-radius:18px;
-  padding:15px;
-  margin-top:15px;
-}
-
-.card h3{
-  margin-top:0;
-}
-
-.trend{
-  padding:9px 0;
-  border-bottom:1px solid #e1e8ed;
-  cursor:pointer;
-}
-
-.trend small{
-  display:block;
-  color:#536471;
-}
-
-.userRow{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px 0;
-}
-
-.userRowInfo{
-  flex:1;
-}
-
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.45);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  z-index:100;
-  padding:20px;
-}
-
-.modalBox{
-  background:#fff;
-  border-radius:18px;
-  width:min(600px,100%);
-  max-height:90vh;
-  overflow:auto;
-  padding:20px;
-}
-
-.modalBox input,
-.modalBox textarea{
-  width:100%;
-  padding:10px;
-  border:1px solid #cfd9de;
-  border-radius:10px;
-  margin:7px 0;
-}
-
-.profileCover{
-  height:180px;
-  background:linear-gradient(135deg,#1d9bf0,#7856ff);
-}
-
-.profileInfo{
-  padding:15px;
-}
-
-.profileBigAvatar{
-  width:100px;
-  height:100px;
-  object-fit:cover;
-  border-radius:50%;
-  border:4px solid white;
-  margin-top:-55px;
-}
-
-.profileActions{
-  float:right;
-  margin-top:10px;
-}
-
-.profileHandle{
-  color:#536471;
-}
-
-.profileBio{
-  margin-top:12px;
-  white-space:pre-wrap;
-}
-
-.profileStats{
-  display:flex;
-  gap:25px;
-  margin-top:15px;
-}
-
-.profileStats div{
-  display:flex;
-  flex-direction:column;
-}
-
-.profileStats span{
-  color:#536471;
-  font-size:13px;
-}
-
-.notification{
-  padding:15px;
-  border-bottom:1px solid #e1e8ed;
-}
-
-.unread{
-  background:#eef7fd;
-}
-
-.dmList{
-  border-bottom:1px solid #e1e8ed;
-}
-
-.dmUser{
-  padding:12px;
-  border-bottom:1px solid #e1e8ed;
-  cursor:pointer;
-}
-
-.dmMessages{
-  height:350px;
-  overflow:auto;
-  padding:10px;
-  background:#f7f9fa;
-}
-
-.dmMessage{
-  padding:8px 12px;
-  border-radius:15px;
-  background:#e8f1ff;
-  margin:5px;
-  max-width:75%;
-}
-
-.dmMessage.me{
-  margin-left:auto;
-  background:#d9ffd9;
-}
-
-.admin{
-  padding:15px;
-}
-
-.adminRow{
-  padding:12px;
-  border-bottom:1px solid #e1e8ed;
-}
-
-.empty{
-  padding:40px 20px;
-  text-align:center;
-  color:#536471;
-}
-
-.toast{
-  position:fixed;
-  bottom:20px;
-  left:50%;
-  transform:translateX(-50%);
-  background:#0f1419;
-  color:white;
-  padding:12px 20px;
-  border-radius:25px;
-  z-index:1000;
-}
-
-@media(max-width:1000px){
-  .app{
-    grid-template-columns:80px minmax(0,650px) 0;
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#f7f9fa; color:#0f1419; }
+  button,input,textarea{ font:inherit; }
+  button{ cursor:pointer; }
+  .hidden{ display:none!important; }
+  .app{ display:grid; grid-template-columns:260px minmax(0,650px) 320px; max-width:1250px; margin:auto; min-height:100vh; }
+  .sidebar{ position:sticky; top:0; height:100vh; padding:20px; border-right:1px solid #e1e8ed; background:#fff; }
+  .logo{ font-size:24px; font-weight:800; color:#1d9bf0; margin-bottom:25px; display: flex;  align-items: center;  gap: 10px;}
+  .logo img {height: 50px;width: auto;}
+    /* 画面幅が600px以下になったら文字を消す */
+    @media (max-width: 600px) {.logo span { display: none;}}
+  .nav button{ display:block; width:100%; text-align:left; border:0; background:transparent; padding:13px 15px; border-radius:25px; margin:4px 0; font-size:16px; }
+  .nav button:hover{ background:#eef7fd; }
+  .postButton{ width:100%; border:0; background:#1d9bf0; color:white; padding:13px; border-radius:25px; font-weight:bold; margin-top:20px; }
+  .main{ min-width:0; border-right:1px solid #e1e8ed; background:#fff; }
+  .pageHeader{ position:sticky; top:0; z-index:10; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); padding:15px; border-bottom:1px solid #e1e8ed; font-weight:800; }
+  .composer{ padding:15px; border-bottom:1px solid #e1e8ed; }
+  .composer textarea{ width:100%; min-height:90px; border:0; outline:0; resize:none; font-size:18px; }
+  .composer input{ width:100%; border:1px solid #cfd9de; border-radius:10px; padding:10px; margin-top:8px; }
+  .composerBottom{ display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .primary{ background:#1d9bf0; color:#fff; border:0; border-radius:22px; padding:9px 18px; font-weight:bold; }
+  .secondary{ background:#fff; color:#0f1419; border:1px solid #cfd9de; border-radius:22px; padding:8px 15px; font-weight:bold; }
+  .danger{ background:#f4212e; color:white; border:0; border-radius:20px; padding:8px 15px; }
+  .post{ padding:15px; border-bottom:1px solid #e1e8ed; transition:.15s; }
+  .post:hover{ background:#fafafa; }
+  .postHead{ display:flex; gap:10px; }
+  .avatar{ width:45px; height:45px; border-radius:50%; object-fit:cover; background:#ddd; }
+  .postUser{ font-weight:700; }
+  .handle{ color:#536471; font-size:14px; }
+  .postText{ margin:8px 0; white-space:pre-wrap; word-break:break-word; cursor:pointer; }
+  .postImage{ width:100%; max-height:450px; object-fit:cover; border-radius:15px; margin-top:8px; border:1px solid #e1e8ed; }
+  .postActions{ display:flex; justify-content:space-between; margin-top:10px; color:#536471; }
+  .action{ border:0; background:transparent; color:#536471; padding:6px; }
+  .action:hover{ color:#1d9bf0; }
+  .action.liked{ color:#f91880; }
+  .action.reposted{ color:#00ba7c; }
+  .rightbar{ padding:15px; }
+  .search{ width:100%; border:0; background:#eff3f4; border-radius:25px; padding:12px 18px; outline:0; }
+  .card{ background:#f7f9f9; border-radius:18px; padding:15px; margin-top:15px; }
+  .card h3{ margin-top:0; }
+  .trend{ padding:9px 0; border-bottom:1px solid #e1e8ed; cursor:pointer; }
+  .trend small{ display:block; color:#536471; }
+  .userRow{ display:flex; align-items:center; gap:10px; padding:10px 0; }
+  .userRowInfo{ flex:1; }
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; justify-content:center; align-items:center; z-index:100; padding:20px; }
+  .modalBox{ background:#fff; border-radius:18px; width:min(600px,100%); max-height:90vh; overflow:auto; padding:20px; }
+  .modalBox input, .modalBox textarea{ width:100%; padding:10px; border:1px solid #cfd9de; border-radius:10px; margin:7px 0; }
+  .profileCover{ height:180px; background:linear-gradient(135deg,#1d9bf0,#7856ff); }
+  .profileInfo{ padding:15px; }
+  .profileBigAvatar{ width:100px; height:100px; object-fit:cover; border-radius:50%; border:4px solid white; margin-top:-55px; }
+  .profileActions{ float:right; margin-top:10px; }
+  .profileHandle{ color:#536471; }
+  .profileBio{ margin-top:12px; white-space:pre-wrap; }
+  .profileStats{ display:flex; gap:25px; margin-top:15px; }
+  .profileStats div{ display:flex; flex-direction:column; }
+  .profileStats span{ color:#536471; font-size:13px; }
+  .notification{ padding:15px; border-bottom:1px solid #e1e8ed; }
+  .unread{ background:#eef7fd; }
+  .dmList{ border-bottom:1px solid #e1e8ed; }
+  .dmUser{ padding:12px; border-bottom:1px solid #e1e8ed; cursor:pointer; }
+  .dmMessages{ height:350px; overflow:auto; padding:10px; background:#f7f9fa; }
+  .dmMessage{ padding:8px 12px; border-radius:15px; background:#e8f1ff; margin:5px; max-width:75%; }
+  .dmMessage.me{ margin-left:auto; background:#d9ffd9; }
+  .admin{ padding:15px; }
+  .adminRow{ padding:12px; border-bottom:1px solid #e1e8ed; }
+  .empty{ padding:40px 20px; text-align:center; color:#536471; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f1419; color:white; padding:12px 20px; border-radius:25px; z-index:1000; }
+  @media(max-width:1000px){
+    .app{ grid-template-columns:80px minmax(0,650px) 0; }
+    .rightbar{ display:none; }
+    .logo{ font-size:0; }
+    .logo:after{ content:"CP"; font-size:22px; }
+    .nav button{ font-size:0; text-align:center; }
+    .nav button:first-letter{ font-size:22px; }
   }
-
-  .rightbar{
-    display:none;
+  @media(max-width:650px){
+    .app{ display:block; }
+    .sidebar{ position:fixed; bottom:0; top:auto; height:60px; width:100%; z-index:50; padding:5px; border-top:1px solid #e1e8ed; border-right:0; }
+    .logo, .postButton{ display:none; }
+    .nav{ display:flex; justify-content:space-around; }
+    .nav button{ margin:0; width:auto; padding:10px; }
+    .main{ padding-bottom:60px; }
   }
+  .profileStatClickable{ cursor:pointer; }
+  .profileStatClickable:hover b, .profileStatClickable:hover span{ color:#1d9bf0; }
+  .profileCover { height: 180px; background-color: #1d9bf0; background-size: cover; background-position: center; background-repeat: no-repeat; }
 
-  .logo{
-    font-size:0;
-  }
-
-  .logo:after{
-    content:"CP";
-    font-size:22px;
-  }
-
-  .nav button{
-    font-size:0;
-    text-align:center;
-  }
-
-  .nav button:first-letter{
-    font-size:22px;
-  }
-}
-
-@media(max-width:650px){
-  .app{
-    display:block;
-  }
-
-  .sidebar{
-    position:fixed;
-    bottom:0;
-    top:auto;
-    height:60px;
-    width:100%;
-    z-index:50;
-    padding:5px;
-    border-top:1px solid #e1e8ed;
-    border-right:0;
-  }
-
-  .logo,
-  .postButton{
-    display:none;
-  }
-
-  .nav{
-    display:flex;
-    justify-content:space-around;
-  }
-
-  .nav button{
-    margin:0;
-    width:auto;
-    padding:10px;
-  }
-
-  .main{
-    padding-bottom:60px;
-  }
-}
-.profileStatClickable{
-  cursor:pointer;
-}
-
-.profileStatClickable:hover b,
-.profileStatClickable:hover span{
-  color:#1d9bf0;
-}
-.profileCover {
-  height: 180px;
-  background-color: #1d9bf0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
+  /* === 投稿詳細 === */
+  .detailBack{ display:flex; align-items:center; gap:15px; }
+  .detailBack button{ font-size:20px; padding:4px 10px; }
+  .detailPostWrap{ border-bottom:1px solid #e1e8ed; padding:15px; }
+  .detailPostText{ font-size:20px; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin:10px 0; }
+  .detailMeta{ color:#536471; font-size:14px; padding:8px 0; border-top:1px solid #e1e8ed; border-bottom:1px solid #e1e8ed; margin-top:10px; }
+  .detailComposer{ padding:15px; border-bottom:1px solid #e1e8ed; }
+  .detailComposer textarea{ width:100%; min-height:80px; border:0; outline:0; resize:none; font-size:17px; padding:8px 0; }
+  .reply{ padding:12px 15px; border-bottom:1px solid #e1e8ed; }
+  .replyHead{ display:flex; gap:10px; }
+  .replyAvatar{ width:36px; height:36px; border-radius:50%; object-fit:cover; background:#ddd; cursor:pointer; }
+  .replyBody{ flex:1; min-width:0; }
+  .replyUser{ font-weight:700; cursor:pointer; }
+  .replyText{ margin:4px 0; white-space:pre-wrap; word-break:break-word; }
+  .replyActions{ display:flex; gap:18px; margin-top:6px; color:#536471; font-size:13px; }
+  .replyActions button{ border:0; background:transparent; color:#536471; padding:4px 6px; border-radius:14px; }
+  .replyActions button:hover{ color:#1d9bf0; background:#eef7fd; }
+  .replyChildren{ margin-left:30px; border-left:2px solid #e1e8ed; padding-left:10px; margin-top:8px; }
+  .replyComposerInline{ padding:10px; background:#f7f9fa; border-bottom:1px solid #e1e8ed; }
+  .replyComposerInline textarea{ width:100%; min-height:60px; border:1px solid #cfd9de; border-radius:12px; padding:8px; outline:0; resize:none; }
+  .replyToHint{ color:#1d9bf0; font-size:13px; margin-bottom:4px; }
 </style>
 </head>
-
 <body>
-
 <div id="loginPage">
-
-  <div style="
-    max-width:420px;
-    margin:80px auto;
-    padding:25px;
-    background:white;
-    border-radius:20px;
-    box-shadow:0 5px 30px rgba(0,0,0,.08)
-  ">
-
-    <h1 style="color:#1d9bf0">
-      chanpro-Post
-    </h1>
-
-    <p>
-      chanpro-Chat と共通アカウント
-    </p>
-
-    <input
-      id="loginName"
-      placeholder="ユーザー名"
-      style="width:100%;padding:12px;margin:5px 0"
-    >
-
-    <input
-      id="loginPassword"
-      type="password"
-      placeholder="パスワード"
-      style="width:100%;padding:12px;margin:5px 0"
-    >
-
-    <button
-      class="primary"
-      style="width:100%;margin-top:10px"
-      onclick="login()"
-    >
-      ログイン
-    </button>
-
-    <button
-      class="secondary"
-      style="width:100%;margin-top:8px"
-      onclick="createAccount()"
-    >
-      新規アカウント作成
-    </button>
-
+  <div style="max-width:420px;margin:80px auto;padding:25px;background:white;border-radius:20px;box-shadow:0 5px 30px rgba(0,0,0,.08)">
+    <h1 style="color:#1d9bf0">chanpro-Post</h1>
+    <p>chanpro-Chat と共通アカウント</p>
+    <input id="loginName" placeholder="ユーザー名" style="width:100%;padding:12px;margin:5px 0">
+    <input id="loginPassword" type="password" placeholder="パスワード" style="width:100%;padding:12px;margin:5px 0">
+    <button class="primary" style="width:100%;margin-top:10px" onclick="login()">ログイン</button>
+    <button class="secondary" style="width:100%;margin-top:8px" onclick="createAccount()">新規アカウント作成</button>
     <div id="loginError" style="color:#f4212e;margin-top:10px"></div>
-
   </div>
-
 </div>
 
-
 <div id="app" class="app hidden">
-
-  <aside class="sidebar">
-
+    <aside class="sidebar">
     <div class="logo">
-      chanpro-Post
+      <img src="https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/4422522/6c28fb79-5ca6-4b57-afa1-9cd0bfa4aef8.png"alt="">
+      <span>chanpro-Post</span>
     </div>
-
     <div class="nav">
+
       <button onclick='showPage("home")'>🏠 ホーム</button>
       <button onclick='showPage("search")'>🔍 検索</button>
       <button onclick='showPage("notifications")'>🔔 通知</button>
@@ -573,5041 +148,1057 @@ button{
       <button onclick='showBookmarks()'>🔖 ブックマーク</button>
       <button id="adminNav" class="hidden" onclick='showPage("admin")'>🛠 管理</button>
     </div>
-
-
-
-    <button
-      class="postButton"
-      onclick="openPostModal()"
-    >
-      投稿
-    </button>
-
-    <button
-      class="secondary"
-      style="width:100%;margin-top:10px"
-      onclick="logout()"
-    >
-      ログアウト
-    </button>
-
+    <button class="postButton" onclick="openPostModal()">投稿</button>
+    <button class="secondary" style="width:100%;margin-top:10px" onclick="logout()">ログアウト</button>
   </aside>
 
-
   <main class="main">
-
     <div id="homePage">
-
-      <div class="pageHeader">
-        ホーム
-      </div>
-
+      <div class="pageHeader">ホーム</div>
       <div class="composer">
-
-        <textarea
-          id="quickPostText"
-          placeholder="いまどうしてる？"
-        ></textarea>
-
-        <input
-          id="quickPostImage"
-          placeholder="画像URL（任意）"
-        >
-
+        <textarea id="quickPostText" placeholder="いまどうしてる？"></textarea>
+        <input id="quickPostImage" placeholder="画像URL（任意）">
         <div class="composerBottom">
-
-          <span>
-            #ハッシュタグ対応
-          </span>
-
-          <button
-            class="primary"
-            onclick="quickPost()"
-          >
-            投稿
-          </button>
-
+          <span>#ハッシュタグ対応</span>
+          <button class="primary" onclick="quickPost()">投稿</button>
         </div>
-
       </div>
-
       <div id="homePosts"></div>
-
     </div>
-
 
     <div id="searchPage" class="hidden">
-
-      <div class="pageHeader">
-        検索
-      </div>
-
+      <div class="pageHeader">検索</div>
       <div style="padding:15px">
-
         <input id="searchInput" class="search" placeholder="ユーザー・投稿・#ハッシュタグ" onkeydown="if(event.key==='Enter')searchAll(this.value)">
-
       </div>
-
       <div id="searchResults"></div>
-
     </div>
-
 
     <div id="notificationPage" class="hidden">
       <div class="pageHeader">通知</div>
       <div id="notifications"></div>
     </div>
 
-
     <div id="messagesPage" class="hidden">
-
-      <div class="pageHeader">
-        DM
-      </div>
-
+      <div class="pageHeader">DM</div>
       <div id="dmContent"></div>
-
     </div>
-
 
     <div id="profilePage" class="hidden"></div>
 
-
     <div id="bookmarksPage" class="hidden">
-
-      <div class="pageHeader">
-        ブックマーク
-      </div>
-
+      <div class="pageHeader">ブックマーク</div>
       <div id="bookmarkPosts"></div>
-
     </div>
 
+    <!-- 投稿詳細ページ -->
+    <div id="detailPage" class="hidden">
+      <div class="pageHeader detailBack">
+        <button class="secondary" onclick="showPage('home')">←</button>
+        <span>投稿</span>
+      </div>
+      <div id="detailContent"></div>
+    </div>
 
     <div id="adminPage" class="hidden">
-
-      <div class="pageHeader">
-        管理者
-      </div>
-
+      <div class="pageHeader">管理者</div>
       <div id="adminContent"></div>
-
     </div>
-
   </main>
 
-
   <aside class="rightbar">
-
-    <div class="card">
-
-      <h3>
-        トレンド
-      </h3>
-
-      <div id="trends"></div>
-
-    </div>
-
-    <div class="card">
-
-      <h3>
-        おすすめユーザー
-      </h3>
-
-      <div id="suggestedUsers"></div>
-
-    </div>
-
+    <div class="card"><h3>トレンド</h3><div id="trends"></div></div>
+    <div class="card"><h3>おすすめユーザー</h3><div id="suggestedUsers"></div></div>
   </aside>
-
 </div>
 
-
-<div
-  id="modal"
-  class="modal hidden"
-  onclick="if(event.target===this)closeModal()"
->
+<div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()">
   <div class="modalBox" id="modalContent"></div>
 </div>
-
 <div id="toast" class="toast hidden"></div>
 
-
 <script>
-/* =========================================================
-   chanpro-Post
-   Supabase アクセス大幅削減版
-   ========================================================= */
+const SUPABASE_URL="https://ldnmqfmebvyzlmhgnljf.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_sJCCy8PpxucgNgweKh9jsA_BKne3v3U";
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-const SUPABASE_URL =
-  "https://ldnmqfmebvyzlmhgnljf.supabase.co";
+let currentUser=null;
+let currentDMUser=null;
+let dmChannel=null;
+let mqttClient=null;
+let currentDetailPost=null; // 詳細ページで開いている投稿
 
-const SUPABASE_ANON_KEY =
-  "sb_publishable_sJCCy8PpxucgNgweKh9jsA_BKne3v3U";
+const MQTT_BROKER="wss://broker.hivemq.com:8884/mqtt";
+const cache={ users:new Map(), posts:new Map(), follows:null, trends:null, suggestedUsers:null };
 
-const supabaseClient = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
-
-
-/* =========================================================
-   State
-   ========================================================= */
-
-let currentUser = null;
-let currentDMUser = null;
-let dmChannel = null;
-let mqttClient = null;
-
-const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
-
-const cache = {
-  users: new Map(),
-  posts: new Map(),
-  follows: null,
-  trends: null,
-  suggestedUsers: null
-};
-
-
-/* =========================================================
-   Basic helpers
-   ========================================================= */
-
-function $(id) {
-  return document.getElementById(id);
+function $(id){ return document.getElementById(id); }
+function escapeHTML(value){
+  return String(value??"")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 }
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function avatarURL(url, size = 100) {
-  return url ||
-    `https://placehold.jp/${size}x${size}.png`;
-}
-
-function toast(message) {
-  $("toast").textContent = message;
+function avatarURL(url,size=100){ return url || `https://placehold.jp/${size}x${size}.png`; }
+function toast(message){
+  $("toast").textContent=message;
   $("toast").classList.remove("hidden");
-
   clearTimeout(window.__toastTimer);
-
-  window.__toastTimer = setTimeout(() => {
-    $("toast").classList.add("hidden");
-  }, 2500);
+  window.__toastTimer=setTimeout(()=>{ $("toast").classList.add("hidden"); },2500);
+}
+function openModal(html){ $("modalContent").innerHTML=html; $("modal").classList.remove("hidden"); }
+function closeModal(){ $("modal").classList.add("hidden"); }
+function safeGet(key){ try{ return localStorage.getItem(key); }catch{ return null; } }
+function safeSet(key,value){ try{ localStorage.setItem(key,value); return true; }catch{ return false; } }
+function safeRemove(key){ try{ localStorage.removeItem(key); }catch{} }
+function formatDate(date){
+  const d=new Date(date);
+  return d.toLocaleString("ja-JP",{ month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit" });
+}
+async function hashPassword(password){
+  const data=new TextEncoder().encode(password);
+  const hash=await crypto.subtle.digest("SHA-256",data);
+  return Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 
-function openModal(html) {
-  $("modalContent").innerHTML = html;
-  $("modal").classList.remove("hidden");
-}
-
-function closeModal() {
-  $("modal").classList.add("hidden");
-}
-
-function safeGet(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
+async function getUser(id,forceRefresh=false){
+  if(!id) return null;
+  if(!forceRefresh){
+    const cached=cache.users.get(id);
+    if(cached) return cached;
   }
-}
-
-function safeSet(key, value) {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function safeRemove(key) {
-  try {
-    localStorage.removeItem(key);
-  } catch {}
-}
-
-function formatDate(date) {
-  const d = new Date(date);
-
-  return d.toLocaleString("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-
-/* =========================================================
-   Password
-   ========================================================= */
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    data
-  );
-
-  return Array.from(new Uint8Array(hash))
-    .map(x => x.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-
-/* =========================================================
-   User cache
-   ========================================================= */
-
-
-async function getUser(id) {
-  if (!id) return null;
-
-  // キャッシュにある古いユーザー情報を使わない
-  cache.users.delete(id);
-
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("users")
-    .select(`
-      id,
-      username,
-      icon_url,
-      cover_url,
-      profile,
-      role,
-      ban_until,
-      program_urls,
-      program_views,
-      program_likes
-    `)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("getUser:", error);
-    return null;
-  }
-
-  if (data) {
-    console.log("プロフィールデータ:", {
-      username: data.username,
-      program_urls: data.program_urls,
-      program_views: data.program_views,
-      program_likes: data.program_likes
-    });
-
-    cache.users.set(id, data);
-  }
-
+  const { data, error }=await supabaseClient.from("users")
+    .select(`id, username, icon_url, cover_url, profile, role, ban_until, program_urls, program_views, program_likes`)
+    .eq("id",id).maybeSingle();
+  if(error){ console.error("getUser error:",error); return null; }
+  if(!data){ console.warn("ユーザーが見つかりません:",id); return null; }
+  cache.users.set(data.id,data);
   return data;
 }
 
-
-
-async function getUsers(ids) {
-  const uniqueIds = [
-    ...new Set((ids || []).filter(Boolean))
-  ];
-
-  if (!uniqueIds.length) return [];
-
-  const missingIds = uniqueIds.filter(
-    id => !cache.users.has(id)
-  );
-
-  if (missingIds.length) {
-    const { data, error } = await supabaseClient
-      .from("users")
-      .select(`
-        id,
-        username,
-        icon_url,
-        cover_url,
-        profile,
-        role,
-        ban_until
-      `)
-      .in("id", missingIds);
-
-    if (error) {
-      console.error("getUsers:", error);
-    } else {
-      for (const user of data || []) {
-        cache.users.set(user.id, user);
-      }
-    }
+async function getUsers(ids){
+  const uniqueIds=[...new Set((ids||[]).filter(Boolean))];
+  if(!uniqueIds.length) return [];
+  const missingIds=uniqueIds.filter(id=>!cache.users.has(id));
+  if(missingIds.length){
+    const { data, error }=await supabaseClient.from("users")
+      .select(`id, username, icon_url, cover_url, profile, role, ban_until`)
+      .in("id",missingIds);
+    if(error){ console.error("getUsers:",error); }
+    else{ for(const user of data||[]) cache.users.set(user.id,user); }
   }
-
-  return uniqueIds
-    .map(id => cache.users.get(id))
-    .filter(Boolean);
+  return uniqueIds.map(id=>cache.users.get(id)).filter(Boolean);
 }
 
-
-/* =========================================================
-   Login
-   ========================================================= */
-
-async function login() {
-  const username = $("loginName").value.trim();
-  const password = $("loginPassword").value;
-
-  if (!username || !password) {
-    $("loginError").textContent = "入力してください";
-    return;
-  }
-
-  const passwordHash = await hashPassword(password);
-
-  const { data, error } = await supabaseClient
-    .from("users")
-    .select(`
-      id,
-      username,
-      icon_url,
-      cover_url,
-      profile,
-      role,
-      ban_until,
-      program_urls
-    `)
-    .eq("username", username)
-    .eq("password_hash", passwordHash)
-    .maybeSingle();
-
-  if (error) {
-    console.error(error);
-    $("loginError").textContent = error.message;
-    return;
-  }
-
-  if (!data) {
-    $("loginError").textContent =
-      "ユーザー名またはパスワードが違います";
-    return;
-  }
-
-  if (
-    data.ban_until &&
-    new Date(data.ban_until) > new Date()
-  ) {
-    $("loginError").textContent =
-      "このアカウントはBANされています";
-    return;
-  }
-
-  currentUser = data;
-  cache.users.set(data.id, data);
-
-  safeSet(
-    "chanpro_post_user",
-    data.id
-  );
-
+async function login(){
+  const username=$("loginName").value.trim();
+  const password=$("loginPassword").value;
+  if(!username||!password){ $("loginError").textContent="入力してください"; return; }
+  const passwordHash=await hashPassword(password);
+  const { data, error }=await supabaseClient.from("users")
+    .select(`id, username, icon_url, cover_url, profile, role, ban_until, program_urls`)
+    .eq("username",username).eq("password_hash",passwordHash).maybeSingle();
+  if(error){ console.error(error); $("loginError").textContent=error.message; return; }
+  if(!data){ $("loginError").textContent="ユーザー名またはパスワードが違います"; return; }
+  if(data.ban_until && new Date(data.ban_until)>new Date()){ $("loginError").textContent="このアカウントはBANされています"; return; }
+  currentUser=data;
+  cache.users.set(data.id,data);
+  safeSet("chanpro_post_user",data.id);
   await afterLogin();
 }
 
-
-async function createAccount() {
-  const username = $("loginName").value.trim();
-  const password = $("loginPassword").value;
-
-  if (!username || !password) {
-    $("loginError").textContent =
-      "ユーザー名とパスワードを入力してください";
+async function createAccount(){
+  const username=$("loginName").value.trim();
+  const password=$("loginPassword").value;
+  if(!username||!password){ $("loginError").textContent="ユーザー名とパスワードを入力してください"; return; }
+  if(username.length<2){ $("loginError").textContent="ユーザー名は2文字以上にしてください"; return; }
+  if(password.length<6){ $("loginError").textContent="パスワードは6文字以上にしてください"; return; }
+  const passwordHash=await hashPassword(password);
+  const { data, error }=await supabaseClient.from("users")
+    .insert({ username, password_hash:passwordHash, ban_count:0, ban_until:null, icon_url:"", profile:"", role:"user" })
+    .select(`id, username, icon_url, cover_url, profile, role, ban_until`).single();
+  if(error){
+    if(error.code==="23505") $("loginError").textContent="そのユーザー名はすでに使用されています";
+    else $("loginError").textContent=error.message;
     return;
   }
-
-  if (username.length < 2) {
-    $("loginError").textContent =
-      "ユーザー名は2文字以上にしてください";
-    return;
-  }
-
-  if (password.length < 6) {
-    $("loginError").textContent =
-      "パスワードは6文字以上にしてください";
-    return;
-  }
-
-  const passwordHash =
-    await hashPassword(password);
-
-  const { data, error } = await supabaseClient
-    .from("users")
-    .insert({
-      username,
-      password_hash: passwordHash,
-      ban_count: 0,
-      ban_until: null,
-      icon_url: "",
-      profile: "",
-      role: "user"
-    })
-    .select(`
-      id,
-      username,
-      icon_url,
-      cover_url,
-      profile,
-      role,
-      ban_until
-    `)
-    .single();
-
-  if (error) {
-    if (error.code === "23505") {
-      $("loginError").textContent =
-        "そのユーザー名はすでに使用されています";
-    } else {
-      $("loginError").textContent =
-        error.message;
-    }
-
-    return;
-  }
-
-  currentUser = data;
-  cache.users.set(data.id, data);
-
-  safeSet(
-    "chanpro_post_user",
-    data.id
-  );
-
+  currentUser=data;
+  cache.users.set(data.id,data);
+  safeSet("chanpro_post_user",data.id);
   await afterLogin();
 }
 
-
-async function restoreLogin() {
-  const id =
-    safeGet("chanpro_post_user");
-
-  if (!id) return;
-
-  const user = await getUser(id);
-
-  if (!user) return;
-
-  if (
-    user.ban_until &&
-    new Date(user.ban_until) > new Date()
-  ) {
+async function restoreLogin(){
+  const id=safeGet("chanpro_post_user");
+  if(!id) return;
+  try{
+    const user=await getUser(id);
+    if(!user){ safeRemove("chanpro_post_user"); return; }
+    if(user.ban_until && new Date(user.ban_until)>new Date()){ safeRemove("chanpro_post_user"); return; }
+    currentUser=user;
+    await afterLogin();
+  }catch(error){
+    console.error("restoreLogin error:",error);
     safeRemove("chanpro_post_user");
-    return;
   }
-
-  currentUser = user;
-
-  await afterLogin();
 }
 
-
-async function afterLogin() {
+async function afterLogin(){
   $("loginPage").classList.add("hidden");
   $("app").classList.remove("hidden");
-
-  // MQTTリアルタイム通信開始
   connectMQTT();
-
-  // DMのSupabase Realtime開始
   subscribeDMRealtime();
-
-  await Promise.all([
-    loadHome(),
-    loadTrends(),
-    loadSuggestedUsers()
-  ]);
-
+  await Promise.all([ loadHome(), loadTrends(), loadSuggestedUsers() ]);
   checkAdmin();
 }
 
-
-function logout() {
-  currentUser = null;
-
-  cache.users.clear();
-  cache.posts.clear();
-  cache.follows = null;
-  cache.trends = null;
-  cache.suggestedUsers = null;
-
+function logout(){
+  currentUser=null;
+  cache.users.clear(); cache.posts.clear(); cache.follows=null; cache.trends=null; cache.suggestedUsers=null;
   safeRemove("chanpro_post_user");
-
   location.reload();
 }
 
-
-/* =========================================================
-   Navigation
-   ========================================================= */
-
-function hidePages() {
-  [
-    "homePage",
-    "searchPage",
-    "notificationPage",
-    "messagesPage",
-    "profilePage",
-    "bookmarksPage",
-    "adminPage"
-  ].forEach(id => {
-    $(id).classList.add("hidden");
-  });
+function hidePages(){
+  ["homePage","searchPage","notificationPage","messagesPage","profilePage","bookmarksPage","adminPage","detailPage"]
+    .forEach(id=>{ $(id).classList.add("hidden"); });
 }
 
-
-async function showPage(page) {
+async function showPage(page){
   hidePages();
-
-  if (page === "home") {
-    $("homePage").classList.remove("hidden");
-    await loadHome();
-  }
-
-  if (page === "search") {
-    $("searchPage").classList.remove("hidden");
-  }
-
-  if (page === "notifications") {
-    $("notificationPage").classList.remove("hidden");
-    await loadNotifications();
-  }
-
-  if (page === "messages") {
-    $("messagesPage").classList.remove("hidden");
-    await loadDMs();
-  }
-
-  if (page === "admin") {
-    $("adminPage").classList.remove("hidden");
-    await loadAdmin();
-  }
+  if(page==="home"){ $("homePage").classList.remove("hidden"); await loadHome(); }
+  if(page==="search"){ $("searchPage").classList.remove("hidden"); }
+  if(page==="notifications"){ $("notificationPage").classList.remove("hidden"); await loadNotifications(); }
+  if(page==="messages"){ $("messagesPage").classList.remove("hidden"); await loadDMs(); }
+  if(page==="admin"){ $("adminPage").classList.remove("hidden"); await loadAdmin(); }
 }
 
-
-/* =========================================================
-   Post creation
-   ========================================================= */
-
-function openPostModal() {
+function openPostModal(){
   openModal(`
     <h2>投稿</h2>
-
-    <textarea
-      id="modalPostText"
-      placeholder="いまどうしてる？"
-      style="width:100%;height:130px"
-    ></textarea>
-
-    <input
-      id="modalPostImage"
-      placeholder="画像URL（任意）"
-    >
-
+    <textarea id="modalPostText" placeholder="いまどうしてる？" style="width:100%;height:130px"></textarea>
+    <input id="modalPostImage" placeholder="画像URL（任意）">
     <div style="text-align:right;margin-top:10px">
-      <button
-        class="secondary"
-        onclick="closeModal()"
-      >
-        キャンセル
-      </button>
-
-      <button
-        class="primary"
-        onclick="submitPost()"
-      >
-        投稿
-      </button>
+      <button class="secondary" onclick="closeModal()">キャンセル</button>
+      <button class="primary" onclick="submitPost()">投稿</button>
     </div>
   `);
 }
 
-
-async function quickPost() {
-  const text =
-    $("quickPostText").value.trim();
-
-  const image =
-    $("quickPostImage").value.trim();
-
-  await createPost(text, image);
-
-  $("quickPostText").value = "";
-  $("quickPostImage").value = "";
+async function quickPost(){
+  const text=$("quickPostText").value.trim();
+  const image=$("quickPostImage").value.trim();
+  await createPost(text,image);
+  $("quickPostText").value="";
+  $("quickPostImage").value="";
 }
 
-
-async function submitPost() {
-  const text =
-    $("modalPostText").value.trim();
-
-  const image =
-    $("modalPostImage").value.trim();
-
-  await createPost(text, image);
-
+async function submitPost(){
+  const text=$("modalPostText").value.trim();
+  const image=$("modalPostImage").value.trim();
+  await createPost(text,image);
   closeModal();
 }
 
-
-
-async function createPost(text, image) {
-  if (!text && !image) {
-    toast("投稿内容を入力してください");
-    return;
+async function createPost(text,image){
+  if(!text && !image){ toast("投稿内容を入力してください"); return; }
+  if(image){
+    try{
+      const url=new URL(image);
+      if(url.protocol!=="http:" && url.protocol!=="https:"){ toast("画像URLが正しくありません"); return; }
+    }catch{ toast("画像URLが正しくありません"); return; }
   }
-
-  if (image) {
-    try {
-      const url = new URL(image);
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        toast("画像URLが正しくありません");
-        return;
-      }
-    } catch {
-      toast("画像URLが正しくありません");
-      return;
-    }
-  }
-
-  const { data, error } = await supabaseClient
-    .from("posts")
-    .insert({
-      user_id: currentUser.id,
-      content: text,
-      image_url: image || null
-    })
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .single();
-
-  if (error) {
-    console.error(error);
-    toast("投稿に失敗しました");
-    return;
-  }
-
-  cache.posts.set(data.id, data);
-
-  await extractHashtags(data.id, text);
-
-  // フォロワーへ「新規投稿」通知
+  const { data, error }=await supabaseClient.from("posts")
+    .insert({ user_id:currentUser.id, content:text, image_url:image||null })
+    .select(`id, user_id, content, image_url, created_at`).single();
+  if(error){ console.error(error); toast("投稿に失敗しました"); return; }
+  cache.posts.set(data.id,data);
+  await extractHashtags(data.id,text);
   await notifyFollowersAboutPost(data.id);
-
-  // MQTTで全体へ新規投稿イベントを通知
-  mqttPublish(mqttTopicGlobal(), {
-    type: "post_created",
-    post_id: data.id,
-    user_id: currentUser.id
-  });
-
+  mqttPublish(mqttTopicGlobal(),{ type:"post_created", post_id:data.id, user_id:currentUser.id });
   toast("投稿しました");
   await loadHome();
 }
 
-
-
-/* =========================================================
-   Hashtags
-   ========================================================= */
-
-async function extractHashtags(
-  postId,
-  text
-) {
-  const tags =
-    text.match(
-      /#[\p{L}\p{N}_]+/gu
-    ) || [];
-
-  const unique = [
-    ...new Set(
-      tags.map(
-        x => x.substring(1).toLowerCase()
-      )
-    )
-  ];
-
-  if (!unique.length) return;
-
-  /*
-   * hashtagsは一括upsert
-   */
-  await supabaseClient
-    .from("hashtags")
-    .upsert(
-      unique.map(tag => ({
-        tag,
-        updated_at:
-          new Date().toISOString()
-      })),
-      {
-        onConflict: "tag"
-      }
-    );
-
-  /*
-   * post_hashtagsも一括insert
-   */
-  await supabaseClient
-    .from("post_hashtags")
-    .insert(
-      unique.map(hashtag => ({
-        post_id: postId,
-        hashtag
-      }))
-    );
-
-  cache.trends = null;
+async function extractHashtags(postId,text){
+  const tags=text.match(/#[\p{L}\p{N}_]+/gu)||[];
+  const unique=[...new Set(tags.map(x=>x.substring(1).toLowerCase()))];
+  if(!unique.length) return;
+  await supabaseClient.from("hashtags")
+    .upsert(unique.map(tag=>({ tag, updated_at:new Date().toISOString() })),{ onConflict:"tag" });
+  await supabaseClient.from("post_hashtags")
+    .insert(unique.map(hashtag=>({ post_id:postId, hashtag })));
+  cache.trends=null;
 }
 
-
-/* =========================================================
-   Content
-   ========================================================= */
-
-function formatContent(text) {
-  let html =
-    escapeHTML(
-      (text || "").trim()
-    );
-
-  html = html.replace(
-    /(^|\s)#([\p{L}\p{N}_]+)/gu,
-    '$1<a href="#" onclick="searchHashtag(\'$2\');return false">#$2</a>'
-  );
-
-  html = html.replace(
-    /(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener">$1</a>'
-  );
-
+function formatContent(text){
+  let html=escapeHTML((text||"").trim());
+  html=html.replace(/(^|\s)#([\p{L}\p{N}_]+)/gu,'$1<a href="#" onclick="searchHashtag(\'$2\');return false">#$2</a>');
+  html=html.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
   return html;
 }
 
-
-/* =========================================================
-   Batch post metadata
-   ========================================================= */
-
-async function getPostMeta(postIds) {
-  const ids = [
-    ...new Set(postIds)
-  ];
-
-  if (!ids.length) {
-    return {
-      likes: new Map(),
-      replies: new Map(),
-      reposts: new Map(),
-      bookmarks: new Set(),
-      myLikes: new Set(),
-      myReposts: new Set()
-    };
+async function getPostMeta(postIds){
+  const ids=[...new Set(postIds)];
+  if(!ids.length){
+    return { likes:new Map(), replies:new Map(), reposts:new Map(), bookmarks:new Set(), myLikes:new Set(), myReposts:new Set() };
   }
-
-  /*
-   * ここが今回の大幅削減ポイント。
-   *
-   * 旧:
-   *   投稿1 → 7アクセス
-   *   投稿2 → 7アクセス
-   *   投稿3 → 7アクセス
-   *   ...
-   *
-   * 新:
-   *   likes
-   *   replies
-   *   reposts
-   *   bookmarks
-   *
-   * をまとめて取得。
-   */
-
-  const [
-    likesResult,
-    repliesResult,
-    repostsResult,
-    bookmarksResult
-  ] = await Promise.all([
-    supabaseClient
-      .from("likes")
-      .select("post_id,user_id")
-      .in("post_id", ids),
-
-    supabaseClient
-      .from("replies")
-      .select("post_id")
-      .in("post_id", ids),
-
-    supabaseClient
-      .from("reposts")
-      .select("post_id,user_id")
-      .in("post_id", ids),
-
-    supabaseClient
-      .from("bookmarks")
-      .select("post_id,user_id")
-      .in("post_id", ids)
-      .eq("user_id", currentUser.id)
+  const [ likesResult, repliesResult, repostsResult, bookmarksResult ]=await Promise.all([
+    supabaseClient.from("likes").select("post_id,user_id").in("post_id",ids),
+    supabaseClient.from("replies").select("post_id").in("post_id",ids),
+    supabaseClient.from("reposts").select("post_id,user_id").in("post_id",ids),
+    supabaseClient.from("bookmarks").select("post_id,user_id").in("post_id",ids).eq("user_id",currentUser.id)
   ]);
-
-  const likes =
-    new Map();
-
-  const replies =
-    new Map();
-
-  const reposts =
-    new Map();
-
-  const bookmarks =
-    new Set();
-
-  const myLikes =
-    new Set();
-
-  const myReposts =
-    new Set();
-
-  for (const row of likesResult.data || []) {
-    likes.set(
-      row.post_id,
-      (likes.get(row.post_id) || 0) + 1
-    );
-
-    if (
-      row.user_id === currentUser.id
-    ) {
-      myLikes.add(row.post_id);
-    }
+  const likes=new Map(), replies=new Map(), reposts=new Map(), bookmarks=new Set(), myLikes=new Set(), myReposts=new Set();
+  for(const row of likesResult.data||[]){
+    likes.set(row.post_id,(likes.get(row.post_id)||0)+1);
+    if(row.user_id===currentUser.id) myLikes.add(row.post_id);
   }
-
-  for (const row of repliesResult.data || []) {
-    replies.set(
-      row.post_id,
-      (replies.get(row.post_id) || 0) + 1
-    );
+  for(const row of repliesResult.data||[]){ replies.set(row.post_id,(replies.get(row.post_id)||0)+1); }
+  for(const row of repostsResult.data||[]){
+    reposts.set(row.post_id,(reposts.get(row.post_id)||0)+1);
+    if(row.user_id===currentUser.id) myReposts.add(row.post_id);
   }
-
-  for (const row of repostsResult.data || []) {
-    reposts.set(
-      row.post_id,
-      (reposts.get(row.post_id) || 0) + 1
-    );
-
-    if (
-      row.user_id === currentUser.id
-    ) {
-      myReposts.add(row.post_id);
-    }
-  }
-
-  for (const row of bookmarksResult.data || []) {
-    bookmarks.add(row.post_id);
-  }
-
-  return {
-    likes,
-    replies,
-    reposts,
-    bookmarks,
-    myLikes,
-    myReposts
-  };
+  for(const row of bookmarksResult.data||[]) bookmarks.add(row.post_id);
+  return { likes, replies, reposts, bookmarks, myLikes, myReposts };
 }
 
-
-/* =========================================================
-   Post rendering
-   ========================================================= */
-
-function createPostElement(
-  post,
-  user,
-  meta
-) {
-  const article =
-    document.createElement("article");
-
-  article.className = "post";
-
-  const likeCount =
-    meta.likes.get(post.id) || 0;
-
-  const replyCount =
-    meta.replies.get(post.id) || 0;
-
-  const repostCount =
-    meta.reposts.get(post.id) || 0;
-
-  const myLike =
-    meta.myLikes.has(post.id);
-
-  const myRepost =
-    meta.myReposts.has(post.id);
-
-  const bookmark =
-    meta.bookmarks.has(post.id);
-
-  const own =
-    post.user_id === currentUser.id;
-
-  article.innerHTML = `
+function createPostElement(post,user,meta){
+  const article=document.createElement("article");
+  article.className="post";
+  const likeCount=meta.likes.get(post.id)||0;
+  const replyCount=meta.replies.get(post.id)||0;
+  const repostCount=meta.reposts.get(post.id)||0;
+  const myLike=meta.myLikes.has(post.id);
+  const myRepost=meta.myReposts.has(post.id);
+  const bookmark=meta.bookmarks.has(post.id);
+  const own=post.user_id===currentUser.id;
+  article.innerHTML=`
     <div class="postHead">
-
-      <img
-        class="avatar"
-        src="${avatarURL(user.icon_url,45)}"
-        onclick="showUserProfile('${user.id}')"
-        style="cursor:pointer"
-      >
-
+      <img class="avatar" src="${avatarURL(user.icon_url,45)}" onclick="showUserProfile('${user.id}')" style="cursor:pointer">
       <div style="flex:1">
-
-        <span
-          class="postUser"
-          onclick="showUserProfile('${user.id}')"
-          style="cursor:pointer"
-        >
-          ${escapeHTML(user.username)}
-        </span>
-
-        <span class="handle">
-          @${escapeHTML(user.username)}
-          · ${formatDate(post.created_at)}
-        </span>
-
-        <div class="postText">${formatContent(post.content)}</div>
-
-        ${
-          post.image_url
-            ? `
-              <img
-                class="postImage"
-                src="${escapeHTML(post.image_url)}"
-                onerror="this.style.display='none'"
-              >
-            `
-            : ""
-        }
-
+        <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer">${escapeHTML(user.username)}</span>
+        <span class="handle">@${escapeHTML(user.username)} · ${formatDate(post.created_at)}</span>
+        <div class="postText" onclick="showPostDetail('${post.id}')">${formatContent(post.content)}</div>
+        ${ post.image_url ? `<img class="postImage" src="${escapeHTML(post.image_url)}" onerror="this.style.display='none'">` : "" }
         <div class="postActions">
-
-          <button
-            class="action"
-            onclick="replyPost('${post.id}')"
-          >
-            💬 ${replyCount}
-          </button>
-
-          <button
-            class="action ${myRepost ? "reposted" : ""}"
-            onclick="toggleRepost('${post.id}')"
-          >
-            🔁 ${repostCount}
-          </button>
-
-          <button
-            class="action ${myLike ? "liked" : ""}"
-            onclick="toggleLike('${post.id}')"
-          >
-            ❤️ ${likeCount}
-          </button>
-
-          <button
-            class="action"
-            onclick="toggleBookmark('${post.id}')"
-          >
-            ${bookmark ? "🔖" : "📑"}
-          </button>
-
-          ${
-            own
-              ? `
-                <button
-                  class="action"
-                  onclick="deletePost('${post.id}')"
-                >
-                  🗑️
-                </button>
-              `
-              : `
-                <button
-                  class="action"
-                  onclick="reportPost('${post.id}','${user.id}')"
-                >
-                  ⚠️
-                </button>
-              `
-          }
-
+          <button class="action" onclick="event.stopPropagation();showPostDetail('${post.id}')">💬 ${replyCount}</button>
+          <button class="action ${myRepost?"reposted":""}" onclick="event.stopPropagation();toggleRepost('${post.id}')">🔁 ${repostCount}</button>
+          <button class="action ${myLike?"liked":""}" onclick="event.stopPropagation();toggleLike('${post.id}')">❤️ ${likeCount}</button>
+          <button class="action" onclick="event.stopPropagation();toggleBookmark('${post.id}')">${bookmark?"🔖":"📑"}</button>
+          ${ own
+            ? `<button class="action" onclick="event.stopPropagation();deletePost('${post.id}')">🗑️</button>`
+            : `<button class="action" onclick="event.stopPropagation();reportPost('${post.id}','${user.id}')">⚠️</button>` }
         </div>
       </div>
     </div>
   `;
-
   return article;
 }
 
-
-/* =========================================================
-   Home
-   ========================================================= */
-
-async function loadHome() {
-  const box = $("homePosts");
-
-  box.innerHTML =
-    `<div class="empty">読み込み中...</div>`;
-
-  /*
-   * 100 → 50
-   * 最初の通信量を半分程度に。
-   */
-  const {
-    data: posts,
-    error
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(50);
-
-  if (error) {
-    console.error(error);
-
-    box.innerHTML =
-      `<div class="empty">
-        読み込みに失敗しました
-      </div>`;
-
-    return;
-  }
-
-  if (!posts || !posts.length) {
-    box.innerHTML =
-      `<div class="empty">
-        まだ投稿がありません
-      </div>`;
-
-    return;
-  }
-
-  /*
-   * ユーザーを一括取得
-   */
-  const userIds =
-    posts.map(post => post.user_id);
-
-  const users =
-    await getUsers(userIds);
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  /*
-   * リアクションを一括取得
-   */
-  const meta =
-    await getPostMeta(
-      posts.map(post => post.id)
-    );
-
-  box.innerHTML = "";
-
-  for (const post of posts) {
-    const user =
-      userMap.get(post.user_id);
-
-    if (!user) continue;
-
-    cache.posts.set(
-      post.id,
-      post
-    );
-
-    box.appendChild(
-      createPostElement(
-        post,
-        user,
-        meta
-      )
-    );
-  }
-}
-
-
-/* =========================================================
-   Like / Repost / Bookmark
-   ========================================================= */
-
-async function toggleLike(postId) {
-  const {
-    data
-  } = await supabaseClient
-    .from("likes")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (data) {
-    await supabaseClient
-      .from("likes")
-      .delete()
-      .eq("id", data.id);
-  } else {
-    await supabaseClient
-      .from("likes")
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id
-      });
-
-    await createNotificationForPost(
-      postId,
-      "like"
-    );
-  }
-
-  await refreshCurrentPage();
-}
-
-
-async function toggleRepost(postId) {
-  const {
-    data
-  } = await supabaseClient
-    .from("reposts")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (data) {
-    await supabaseClient
-      .from("reposts")
-      .delete()
-      .eq("id", data.id);
-  } else {
-    await supabaseClient
-      .from("reposts")
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id
-      });
-
-    await createNotificationForPost(
-      postId,
-      "repost"
-    );
-  }
-
-  await refreshCurrentPage();
-}
-
-
-async function toggleBookmark(postId) {
-  const {
-    data
-  } = await supabaseClient
-    .from("bookmarks")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (data) {
-    await supabaseClient
-      .from("bookmarks")
-      .delete()
-      .eq("id", data.id);
-
-    toast("ブックマークを解除しました");
-  } else {
-    await supabaseClient
-      .from("bookmarks")
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id
-      });
-
-    toast("ブックマークしました");
-  }
-
-  await refreshCurrentPage();
-}
-
-
-/* =========================================================
-   Bookmarks
-   ========================================================= */
-
-async function showBookmarks() {
+// =========================
+// 投稿詳細ページ（X風）
+// =========================
+async function showPostDetail(postId){
+  if(!postId){ toast("投稿IDがありません"); return; }
   hidePages();
+  $("detailPage").classList.remove("hidden");
+  const box=$("detailContent");
+  box.innerHTML=`<div class="empty">読み込み中...</div>`;
 
-  $("bookmarksPage")
-    .classList.remove("hidden");
-
-  const box =
-    $("bookmarkPosts");
-
-  box.innerHTML =
-    `<div class="empty">読み込み中...</div>`;
-
-  const {
-    data: bookmarks,
-    error
-  } = await supabaseClient
-    .from("bookmarks")
-    .select("post_id")
-    .eq(
-      "user_id",
-      currentUser.id
-    )
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(50);
-
-  if (error) {
-    console.error(error);
-
-    box.innerHTML =
-      `<div class="empty">取得失敗</div>`;
-
-    return;
+  let post=cache.posts.get(postId);
+  if(!post){
+    const { data, error }=await supabaseClient.from("posts")
+      .select(`id, user_id, content, image_url, created_at`).eq("id",postId).maybeSingle();
+    if(error||!data){ box.innerHTML=`<div class="empty">投稿が見つかりません</div>`; return; }
+    post=data;
+    cache.posts.set(post.id,post);
   }
+  currentDetailPost=post;
 
-  const postIds =
-    (bookmarks || [])
-      .map(x => x.post_id);
+  const user=await getUser(post.user_id,true);
+  if(!user){ box.innerHTML=`<div class="empty">ユーザー情報を取得できません</div>`; return; }
 
-  if (!postIds.length) {
-    box.innerHTML =
-      `<div class="empty">
-        ブックマークはありません
-      </div>`;
+  const meta=await getPostMeta([post.id]);
+  const likeCount=meta.likes.get(post.id)||0;
+  const repostCount=meta.reposts.get(post.id)||0;
+  const myLike=meta.myLikes.has(post.id);
+  const myRepost=meta.myReposts.has(post.id);
+  const bookmark=meta.bookmarks.has(post.id);
 
-    return;
-  }
-
-  const {
-    data: posts
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .in("id", postIds);
-
-  if (!posts?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        投稿がありません
-      </div>`;
-
-    return;
-  }
-
-  const users =
-    await getUsers(
-      posts.map(post => post.user_id)
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  const meta =
-    await getPostMeta(
-      posts.map(post => post.id)
-    );
-
-  const postMap =
-    new Map(
-      posts.map(post => [
-        post.id,
-        post
-      ])
-    );
-
-  box.innerHTML = "";
-
-  for (const id of postIds) {
-    const post =
-      postMap.get(id);
-
-    if (!post) continue;
-
-    const user =
-      userMap.get(post.user_id);
-
-    if (!user) continue;
-
-    box.appendChild(
-      createPostElement(
-        post,
-        user,
-        meta
-      )
-    );
-  }
-}
-
-
-/* =========================================================
-   Reply
-   ========================================================= */
-
-async function replyPost(postId) {
-  openModal(`
-    <h2>返信</h2>
-
-    <textarea
-      id="replyText"
-      placeholder="返信を入力"
-      style="width:100%;height:120px"
-    ></textarea>
-
-    <div style="text-align:right">
-      <button
-        class="primary"
-        onclick="submitReply('${postId}')"
-      >
-        返信
-      </button>
-    </div>
-
-    <div id="replyList">
-      読み込み中...
-    </div>
-  `);
-
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("replies")
-    .select(`
-      id,
-      user_id,
-      content,
-      created_at
-    `)
-    .eq("post_id", postId)
-    .order("created_at", {
-      ascending: true
-    });
-
-  if (error) {
-    $("replyList").innerHTML =
-      `<div class="empty">
-        返信を取得できませんでした
-      </div>`;
-
-    return;
-  }
-
-  const users =
-    await getUsers(
-      (data || []).map(
-        reply => reply.user_id
-      )
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  const list =
-    $("replyList");
-
-  list.innerHTML = "";
-
-  for (const reply of data || []) {
-    const user =
-      userMap.get(reply.user_id);
-
-    list.innerHTML += `
-      <div
-        style="
-          border-top:1px solid #e1e8ed;
-          padding:10px 0
-        "
-      >
-        <b>
-          ${escapeHTML(
-            user?.username || "ユーザー"
-          )}
-        </b>
-
-        <div>
-          ${escapeHTML(reply.content)}
+  box.innerHTML=`
+    <div class="detailPostWrap">
+      <div class="postHead">
+        <img class="avatar" src="${avatarURL(user.icon_url,50)}" onclick="showUserProfile('${user.id}')" style="cursor:pointer">
+        <div style="flex:1">
+          <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer;font-size:17px">${escapeHTML(user.username)}</span>
+          <div class="handle">@${escapeHTML(user.username)}</div>
         </div>
       </div>
-    `;
-  }
+      <div class="detailPostText">${formatContent(post.content)}</div>
+      ${ post.image_url ? `<img class="postImage" src="${escapeHTML(post.image_url)}" onerror="this.style.display='none'">` : "" }
+      <div class="detailMeta">${formatDate(post.created_at)}</div>
+      <div class="postActions">
+        <button class="action" onclick="openDetailReplyComposer()">💬 返信する</button>
+        <button class="action ${myRepost?"reposted":""}" onclick="toggleRepost('${post.id}')">🔁 ${repostCount}</button>
+        <button class="action ${myLike?"liked":""}" onclick="toggleLike('${post.id}')">❤️ ${likeCount}</button>
+        <button class="action" onclick="toggleBookmark('${post.id}')">${bookmark?"🔖":"📑"}</button>
+      </div>
+    </div>
 
-  if (!data?.length) {
-    list.innerHTML =
-      `<div class="empty">
-        まだ返信はありません
-      </div>`;
-  }
+    <div id="detailReplyComposer" class="detailComposer" style="display:none">
+      <div class="replyToHint" id="detailReplyHint"></div>
+      <textarea id="detailReplyText" placeholder="返信を入力"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button class="secondary" onclick="closeDetailReplyComposer()">キャンセル</button>
+        <button class="primary" onclick="submitDetailReply()">返信</button>
+      </div>
+    </div>
+
+    <div id="detailReplies"></div>
+  `;
+
+  // 返信一覧（ネスト表示）
+  await renderDetailReplies(post.id);
 }
 
+let detailReplyParent=null; // 詳細ページの返信先（null=投稿へ、それ以外=返信ID）
 
-async function submitReply(postId) {
-  const content =
-    $("replyText").value.trim();
+function openDetailReplyComposer(parentReplyId=null,parentUser=null){
+  const wrap=$("detailReplyComposer");
+  const hint=$("detailReplyHint");
+  const ta=$("detailReplyText");
+  detailReplyParent=parentReplyId;
+  wrap.style.display="block";
+  if(parentReplyId && parentUser){
+    hint.textContent=`@${parentUser.username} に返信`;
+    ta.placeholder=`@${parentUser.username} に返信`;
+  }else{
+    hint.textContent="";
+    ta.placeholder="返信を入力";
+  }
+  ta.value="";
+  ta.focus();
+  wrap.scrollIntoView({ behavior:"smooth", block:"center" });
+}
 
-  if (!content) return;
+function closeDetailReplyComposer(){
+  $("detailReplyComposer").style.display="none";
+  detailReplyParent=null;
+}
 
-  const {
-    error
-  } = await supabaseClient
-    .from("replies")
-    .insert({
-      post_id: postId,
-      user_id: currentUser.id,
-      content
-    });
+async function submitDetailReply(){
+  if(!currentDetailPost) return;
+  const content=$("detailReplyText").value.trim();
+  if(!content){ toast("返信内容を入力してください"); return; }
+  const insertData={
+    post_id: currentDetailPost.id,
+    user_id: currentUser.id,
+    content
+  };
+  if(detailReplyParent) insertData.parent_reply_id=detailReplyParent;
 
-  if (error) {
+  const { data, error }=await supabaseClient.from("replies")
+    .insert(insertData)
+    .select(`id, post_id, user_id, content, parent_reply_id, created_at`).single();
+  if(error){
+    console.error("返信送信:",error);
     toast("返信に失敗しました");
     return;
   }
-
-  await createNotificationForPost(
-    postId,
-    "reply"
-  );
-
-  closeModal();
-
-  await refreshCurrentPage();
+  await createNotificationForPost(currentDetailPost.id,"reply");
+  closeDetailReplyComposer();
+  toast("返信しました");
+  await renderDetailReplies(currentDetailPost.id);
 }
 
-
-/* =========================================================
-   Delete post
-   ========================================================= */
-
-function deletePost(postId) {
-  openModal(`
-    <h2>投稿を削除</h2>
-
-    <p style="margin:20px 0">
-      この投稿を削除しますか？
-    </p>
-
-    <div style="text-align:right">
-
-      <button
-        class="secondary"
-        onclick="closeModal()"
-      >
-        キャンセル
-      </button>
-
-      <button
-        class="danger"
-        onclick="executeDeletePost('${postId}')"
-        style="margin-left:8px"
-      >
-        削除する
-      </button>
-
-    </div>
-  `);
-}
-
-
-async function executeDeletePost(postId) {
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("posts")
-    .delete()
-    .eq("id", postId)
-    .eq("user_id", currentUser.id)
-    .select("id");
-
-  if (error) {
-    console.error(error);
-    closeModal();
-    toast("削除できませんでした");
+// 返信ツリーを構築して描画
+async function renderDetailReplies(postId){
+  const box=$("detailReplies");
+  box.innerHTML=`<div class="empty">読み込み中...</div>`;
+  const { data, error }=await supabaseClient.from("replies")
+    .select(`id, post_id, user_id, content, parent_reply_id, created_at`)
+    .eq("post_id",postId)
+    .order("created_at",{ ascending:true });
+  if(error){
+    console.error("返信取得:",error);
+    box.innerHTML=`<div class="empty">返信を取得できませんでした</div>`;
     return;
   }
-
-  if (!data?.length) {
-    closeModal();
-    toast("削除する権限がありません");
+  if(!data||!data.length){
+    box.innerHTML=`<div class="empty">まだ返信はありません</div>`;
     return;
   }
+  const users=await getUsers(data.map(r=>r.user_id));
+  const userMap=new Map(users.map(u=>[u.id,u]));
+  box.innerHTML="";
 
-  cache.posts.delete(postId);
-
-  closeModal();
-
-  toast("投稿を削除しました");
-
-  await refreshCurrentPage();
-}
-
-
-/* =========================================================
-   Profile
-   ========================================================= */
-
-async function showMyProfile() {
-  await showUserProfile(
-    currentUser.id
-  );
-}
-
-
-async function showUserProfile(userId) {
-  hidePages();
-
-  $("profilePage")
-    .classList.remove("hidden");
-
-  $("profilePage").innerHTML =
-    `<div class="empty">読み込み中...</div>`;
-
-  const user =
-    await getUser(userId);
-
-  if (!user) {
-    $("profilePage").innerHTML =
-      `<div class="empty">
-        ユーザーが見つかりません
-      </div>`;
-
-    return;
+  // ツリー構築
+  const byParent=new Map();
+  const topLevel=[];
+  for(const reply of data){
+    const arr=byParent.get(reply.parent_reply_id||null)||[];
+    arr.push(reply);
+    byParent.set(reply.parent_reply_id||null,arr);
+  }
+  for(const reply of data){
+    if(!reply.parent_reply_id) topLevel.push(reply);
   }
 
-  /*
-   * 4つのCOUNTを並列化
-   */
-  const [
-    followersResult,
-    followingResult,
-    postsResult
-  ] = await Promise.all([
-    supabaseClient
-      .from("follows")
-      .select("*", {
-        count: "exact",
-        head: true
-      })
-      .eq("following_id", userId),
-
-    supabaseClient
-      .from("follows")
-      .select("*", {
-        count: "exact",
-        head: true
-      })
-      .eq("follower_id", userId),
-
-    supabaseClient
-      .from("posts")
-      .select("*", {
-        count: "exact",
-        head: true
-      })
-      .eq("user_id", userId)
-  ]);
-
-  let isFollowing = false;
-
-  if (userId !== currentUser.id) {
-    /*
-     * キャッシュ可能なフォロー情報
-     */
-    const { data } =
-      await supabaseClient
-        .from("follows")
-        .select("id")
-        .eq(
-          "follower_id",
-          currentUser.id
-        )
-        .eq(
-          "following_id",
-          userId
-        )
-        .maybeSingle();
-
-    isFollowing = !!data;
-  }
-
-  const followersCount =
-    followersResult.count || 0;
-
-  const followingCount =
-    followingResult.count || 0;
-
-  const postCount =
-    postsResult.count || 0;
-
-
-$("profilePage").innerHTML = `
-
-  <div class="profileCover" style="background-image:url('${escapeHTML(user.cover_url || "")}');"></div>
-
-  <div class="profileInfo">
-
-    <img
-      class="profileBigAvatar"
-      src="${avatarURL(
-        user.icon_url,
-        100
-      )}"
-    >
-
-    <div class="profileActions">
-
-      ${
-        userId === currentUser.id
-          ? `
-            <button
-              class="secondary"
-              onclick="openProfileEdit()"
-            >
-              プロフィール編集
-            </button>
-          `
-          : `
-            <div
-              style="
-                display:flex;
-                gap:8px;
-                flex-wrap:wrap;
-              "
-            >
-
-              <button
-                class="${
-                  isFollowing
-                    ? "secondary"
-                    : "primary"
-                }"
-                onclick="toggleFollow('${userId}')"
-              >
-                ${
-                  isFollowing
-                    ? "フォロー中"
-                    : "フォロー"
-                }
-              </button>
-
-              <button
-                class="secondary"
-                onclick="openDM('${userId}')"
-              >
-                ✉️ DM
-              </button>
-
-            </div>
-          `
-      }
-
-    </div>
-
-    <h2>
-      ${escapeHTML(user.username)}
-    </h2>
-
-    <div class="profileHandle">
-      @${escapeHTML(user.username)}
-    </div>
-
-    <div class="profileBio">${escapeHTML((user.profile || "自己紹介はありません").trim())}</div>
-
-    ${
-      Array.isArray(user.program_urls) &&
-      user.program_urls.length
-        ? `
-          <div
-            class="programStats"
-            style="
-              margin-top:15px;
-            "
-          >
-
-            <h3 style="margin-bottom:10px;">
-              プログラム
-            </h3>
-
-
-${
-  Array.isArray(user.program_urls) &&
-  user.program_urls.length > 0
-    ? `
-      <div
-        style="
-          display:flex;
-          gap:30px;
-          margin:20px 0;
-          align-items:center;
-        "
-      >
-
-        ${
-          Array.isArray(user.program_views) &&
-          user.program_views.some(v => v != null)
-            ? `
-              <div style="text-align:center;">
-                <div
-                  style="
-                    font-size:28px;
-                    font-weight:700;
-                  "
-                >
-                  👀️ ${user.program_views
-                    .reduce(
-                      (sum, value) =>
-                        sum + (Number(value) || 0),
-                      0
-                    )
-                    .toLocaleString("ja-JP")}
-                </div>
-
-                <div
-                  style="
-                    font-size:14px;
-                    color:#657786;
-                    margin-top:3px;
-                  "
-                >
-                  閲覧
-                </div>
-              </div>
-            `
-            : ""
-        }
-
-        ${
-          Array.isArray(user.program_likes) &&
-          user.program_likes.some(v => v != null)
-            ? `
-              <div style="text-align:center;">
-                <div
-                  style="
-                    font-size:28px;
-                    font-weight:700;
-                  "
-                >
-                  ❤️ ${user.program_likes
-                    .reduce(
-                      (sum, value) =>
-                        sum + (Number(value) || 0),
-                      0
-                    )
-                    .toLocaleString("ja-JP")}
-                </div>
-
-                <div
-                  style="
-                    font-size:14px;
-                    color:#657786;
-                    margin-top:3px;
-                  "
-                >
-                  いいね
-                </div>
-              </div>
-            `
-            : ""
-        }
-
-      </div>
-    `
-    : ""
-}
-
-
+  const renderReply=(reply,depth=0)=>{
+    const user=userMap.get(reply.user_id)||{ username:"ユーザー", id:reply.user_id };
+    const wrap=document.createElement("div");
+    wrap.className="reply";
+    wrap.dataset.replyId=reply.id;
+    const own=reply.user_id===currentUser.id;
+    wrap.innerHTML=`
+      <div class="replyHead">
+        <img class="replyAvatar" src="${avatarURL(user.icon_url,36)}" onclick="showUserProfile('${user.id}')">
+        <div class="replyBody">
+          <span class="replyUser" onclick="showUserProfile('${user.id}')">${escapeHTML(user.username)}</span>
+          <span class="handle">@${escapeHTML(user.username)} · ${formatDate(reply.created_at)}</span>
+          <div class="replyText">${formatContent(reply.content)}</div>
+          <div class="replyActions">
+            <button onclick="openDetailReplyComposer('${reply.id}',${JSON.stringify(user).replace(/"/g,'&quot;')})">💬 返信</button>
+            ${ own ? `<button onclick="deleteReply('${reply.id}')" style="color:#f4212e">🗑️ 削除</button>` : `<button onclick="reportReply('${reply.id}','${reply.user_id}')">⚠️ 通報</button>` }
           </div>
-        `
-        : ""
-    }
-
-    <div class="profileStats">
-
-      <div
-        class="profileStatClickable"
-        onclick="
-          showFollowList(
-            '${userId}',
-            'following'
-          )
-        "
-      >
-        <b>${followingCount}</b>
-        <span>フォロー中</span>
-      </div>
-
-      <div
-        class="profileStatClickable"
-        onclick="
-          showFollowList(
-            '${userId}',
-            'followers'
-          )
-        "
-      >
-        <b>${followersCount}</b>
-        <span>フォロワー</span>
-      </div>
-
-      <div>
-        <b>${postCount}</b>
-        <span>投稿</span>
-      </div>
-
-    </div>
-
-  </div>
-
-</div>
-
-<div id="profilePosts"></div>
-
-`;
-
-
-  /*
-   * 投稿と関連ユーザーを一括取得
-   */
-  const {
-    data: userPosts
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .eq("user_id", userId)
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(50);
-
-  const box =
-    $("profilePosts");
-
-  if (!userPosts?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        まだ投稿がありません
-      </div>`;
-
-    return;
-  }
-
-  const meta =
-    await getPostMeta(
-      userPosts.map(post => post.id)
-    );
-
-  for (const post of userPosts) {
-    box.appendChild(
-      createPostElement(
-        post,
-        user,
-        meta
-      )
-    );
-  }
-}
-
-
-/* =========================================================
-   Follow list
-   ========================================================= */
-
-async function showFollowList(
-  userId,
-  type
-) {
-  const user =
-    await getUser(userId);
-
-  if (!user) return;
-
-  const isFollowers =
-    type === "followers";
-
-  const title =
-    isFollowers
-      ? "フォロワー"
-      : "フォロー中";
-
-  const column =
-    isFollowers
-      ? "following_id"
-      : "follower_id";
-
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("follows")
-    .select(`
-      follower_id,
-      following_id
-    `)
-    .eq(column, userId);
-
-  if (error) {
-    console.error(error);
-
-    openModal(`
-      <h2>${title}</h2>
-      <div class="empty">
-        一覧を取得できませんでした
-      </div>
-    `);
-
-    return;
-  }
-
-  openModal(`
-    <h2>
-      ${escapeHTML(user.username)}
-      の${title}
-    </h2>
-
-    <div id="followList"></div>
-  `);
-
-  const box =
-    $("followList");
-
-  if (!data?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        ${title}はいません
-      </div>`;
-
-    return;
-  }
-
-  const targetIds =
-    data.map(item =>
-      isFollowers
-        ? item.follower_id
-        : item.following_id
-    );
-
-  /*
-   * ユーザーを一括取得
-   */
-  const users =
-    await getUsers(targetIds);
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  /*
-   * 自分がフォローしている人を一括取得
-   */
-  const {
-    data: myFollows
-  } = await supabaseClient
-    .from("follows")
-    .select("following_id")
-    .eq(
-      "follower_id",
-      currentUser.id
-    )
-    .in(
-      "following_id",
-      targetIds
-    );
-
-  const followingSet =
-    new Set(
-      (myFollows || [])
-        .map(x => x.following_id)
-    );
-
-  for (const item of data) {
-    const targetUserId =
-      isFollowers
-        ? item.follower_id
-        : item.following_id;
-
-    const targetUser =
-      userMap.get(targetUserId);
-
-    if (!targetUser) continue;
-
-    const isFollowing =
-      followingSet.has(
-        targetUser.id
-      );
-
-    const row =
-      document.createElement("div");
-
-    row.className = "userRow";
-
-    row.innerHTML = `
-      <img
-        class="avatar"
-        src="${avatarURL(
-          targetUser.icon_url,
-          45
-        )}"
-        style="cursor:pointer"
-      >
-
-      <div
-        class="userRowInfo"
-        style="cursor:pointer"
-      >
-        <b>
-          ${escapeHTML(
-            targetUser.username
-          )}
-        </b>
-
-        <div class="handle">
-          @${escapeHTML(
-            targetUser.username
-          )}
         </div>
       </div>
-
-      ${
-        targetUser.id !== currentUser.id
-          ? `
-            <button
-              class="${
-                isFollowing
-                  ? "secondary"
-                  : "primary"
-              }"
-            >
-              ${
-                isFollowing
-                  ? "フォロー中"
-                  : "フォロー"
-              }
-            </button>
-          `
-          : ""
-      }
     `;
+    box.appendChild(wrap);
 
-    row.querySelector(
-      ".avatar"
-    ).onclick = () => {
-      closeModal();
-      showUserProfile(
-        targetUser.id
-      );
-    };
-
-    row.querySelector(
-      ".userRowInfo"
-    ).onclick = () => {
-      closeModal();
-      showUserProfile(
-        targetUser.id
-      );
-    };
-
-    const button =
-      row.querySelector("button");
-
-    if (button) {
-      button.onclick = async () => {
-        await toggleFollowFromList(
-          targetUser.id,
-          userId,
-          type
-        );
-      };
+    const children=byParent.get(reply.id)||[];
+    if(children.length){
+      const childWrap=document.createElement("div");
+      childWrap.className="replyChildren";
+      wrap.appendChild(childWrap);
+      // 子は子の中に追加するため、一時的に box を差し替え
+      const originalBox=box;
+      // 直接 childWrap に追加するため再帰呼び出しを childWrap 対象に
+      children.forEach(child=>{
+        renderReplyInto(childWrap,child,depth+1,byParent,userMap);
+      });
     }
+  };
 
+  // 子返信を任意のコンテナに描画する補助
+  function renderReplyInto(container,reply,depth,byParent,userMap){
+    const user=userMap.get(reply.user_id)||{ username:"ユーザー", id:reply.user_id };
+    const own=reply.user_id===currentUser.id;
+    const el=document.createElement("div");
+    el.className="reply";
+    el.dataset.replyId=reply.id;
+    el.innerHTML=`
+      <div class="replyHead">
+        <img class="replyAvatar" src="${avatarURL(user.icon_url,36)}" onclick="showUserProfile('${user.id}')">
+        <div class="replyBody">
+          <span class="replyUser" onclick="showUserProfile('${user.id}')">${escapeHTML(user.username)}</span>
+          <span class="handle">@${escapeHTML(user.username)} · ${formatDate(reply.created_at)}</span>
+          <div class="replyText">${formatContent(reply.content)}</div>
+          <div class="replyActions">
+            <button onclick="openDetailReplyComposer('${reply.id}',${JSON.stringify(user).replace(/"/g,'&quot;')})">💬 返信</button>
+            ${ own ? `<button onclick="deleteReply('${reply.id}')" style="color:#f4212e">🗑️ 削除</button>` : `<button onclick="reportReply('${reply.id}','${reply.user_id}')">⚠️ 通報</button>` }
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(el);
+    const children=byParent.get(reply.id)||[];
+    if(children.length){
+      const childWrap=document.createElement("div");
+      childWrap.className="replyChildren";
+      el.appendChild(childWrap);
+      children.forEach(child=>renderReplyInto(childWrap,child,depth+1,byParent,userMap));
+    }
+  }
+
+  topLevel.forEach(reply=>renderReply(reply,0));
+}
+
+async function deleteReply(replyId){
+  if(!confirm("この返信を削除しますか？")) return;
+  const { error }=await supabaseClient.from("replies")
+    .delete().eq("id",replyId).eq("user_id",currentUser.id);
+  if(error){ console.error(error); toast("削除に失敗しました"); return; }
+  toast("返信を削除しました");
+  if(currentDetailPost && !$("detailPage").classList.contains("hidden")){
+    await renderDetailReplies(currentDetailPost.id);
+  } else {
+    await refreshCurrentPage();
+  }
+}
+
+async function reportReply(replyId,userId){
+  const reason=prompt("通報理由を入力してください");
+  if(!reason) return;
+  const { error }=await supabaseClient.from("reports")
+    .insert({ reporter_id:currentUser.id, target_user_id:userId, reason });
+  if(error){ console.error(error); toast("通報できませんでした"); return; }
+  toast("通報しました");
+}
+
+// 既存のモーダル返信（ホーム等からの返信）も詳細ページへ誘導
+async function replyPost(postId){
+  await showPostDetail(postId);
+  setTimeout(()=>openDetailReplyComposer(),200);
+}
+
+async function submitReply(postId){
+  // 互換用：詳細ページ経由に統一したためここは使用しないが残す
+  await showPostDetail(postId);
+}
+
+async function toggleLike(postId){
+  const { data }=await supabaseClient.from("likes")
+    .select("id").eq("post_id",postId).eq("user_id",currentUser.id).maybeSingle();
+  if(data){
+    await supabaseClient.from("likes").delete().eq("id",data.id);
+  }else{
+    await supabaseClient.from("likes").insert({ post_id:postId, user_id:currentUser.id });
+    await createNotificationForPost(postId,"like");
+  }
+  await refreshCurrentPage();
+}
+
+async function toggleRepost(postId){
+  const { data }=await supabaseClient.from("reposts")
+    .select("id").eq("post_id",postId).eq("user_id",currentUser.id).maybeSingle();
+  if(data){
+    await supabaseClient.from("reposts").delete().eq("id",data.id);
+  }else{
+    await supabaseClient.from("reposts").insert({ post_id:postId, user_id:currentUser.id });
+    await createNotificationForPost(postId,"repost");
+  }
+  await refreshCurrentPage();
+}
+
+async function toggleBookmark(postId){
+  const { data }=await supabaseClient.from("bookmarks")
+    .select("id").eq("post_id",postId).eq("user_id",currentUser.id).maybeSingle();
+  if(data){
+    await supabaseClient.from("bookmarks").delete().eq("id",data.id);
+    toast("ブックマークを解除しました");
+  }else{
+    await supabaseClient.from("bookmarks").insert({ post_id:postId, user_id:currentUser.id });
+    toast("ブックマークしました");
+  }
+  await refreshCurrentPage();
+}
+
+async function showBookmarks(){
+  hidePages();
+  $("bookmarksPage").classList.remove("hidden");
+  const box=$("bookmarkPosts");
+  box.innerHTML=`<div class="empty">読み込み中...</div>`;
+  const { data: bookmarks, error }=await supabaseClient.from("bookmarks")
+    .select("post_id").eq("user_id",currentUser.id)
+    .order("created_at",{ ascending:false }).limit(50);
+  if(error){ console.error(error); box.innerHTML=`<div class="empty">取得失敗</div>`; return; }
+  const postIds=(bookmarks||[]).map(x=>x.post_id);
+  if(!postIds.length){ box.innerHTML=`<div class="empty">ブックマークはありません</div>`; return; }
+  const { data: posts }=await supabaseClient.from("posts")
+    .select(`id, user_id, content, image_url, created_at`).in("id",postIds);
+  if(!posts?.length){ box.innerHTML=`<div class="empty">投稿がありません</div>`; return; }
+  const users=await getUsers(posts.map(post=>post.user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  const meta=await getPostMeta(posts.map(post=>post.id));
+  const postMap=new Map(posts.map(post=>[post.id,post]));
+  box.innerHTML="";
+  for(const id of postIds){
+    const post=postMap.get(id);
+    if(!post) continue;
+    const user=userMap.get(post.user_id);
+    if(!user) continue;
+    box.appendChild(createPostElement(post,user,meta));
+  }
+}
+
+function deletePost(postId){
+  openModal(`
+    <h2>投稿を削除</h2>
+    <p style="margin:20px 0">この投稿を削除しますか？</p>
+    <div style="text-align:right">
+      <button class="secondary" onclick="closeModal()">キャンセル</button>
+      <button class="danger" onclick="executeDeletePost('${postId}')" style="margin-left:8px">削除する</button>
+    </div>
+  `);
+}
+
+async function executeDeletePost(postId){
+  const { data, error }=await supabaseClient.from("posts")
+    .delete().eq("id",postId).eq("user_id",currentUser.id).select("id");
+  if(error){ console.error(error); closeModal(); toast("削除できませんでした"); return; }
+  if(!data?.length){ closeModal(); toast("削除する権限がありません"); return; }
+  cache.posts.delete(postId);
+  closeModal();
+  toast("投稿を削除しました");
+  // 詳細ページを開いていた場合はホームへ戻す
+  if(!$("detailPage").classList.contains("hidden")){ await showPage("home"); }
+  else{ await refreshCurrentPage(); }
+}
+
+async function showMyProfile(){ await showUserProfile(currentUser.id); }
+
+async function showUserProfile(userId){
+  if(!userId){ toast("ユーザーIDがありません"); return; }
+  console.log("showUserProfile:",userId);
+  hidePages();
+  $("profilePage").classList.remove("hidden");
+  $("profilePage").innerHTML=`<div class="empty">読み込み中...</div>`;
+  try{
+    const user=await getUser(userId,true);
+    if(!user){ $("profilePage").innerHTML=`<div class="empty">ユーザーが見つかりません</div>`; return; }
+    const [ followersResult, followingResult, postsResult ]=await Promise.all([
+      supabaseClient.from("follows").select("*",{ count:"exact", head:true }).eq("following_id",userId),
+      supabaseClient.from("follows").select("*",{ count:"exact", head:true }).eq("follower_id",userId),
+      supabaseClient.from("posts").select("*",{ count:"exact", head:true }).eq("user_id",userId)
+    ]);
+    if(followersResult.error) console.error("followers取得エラー:",followersResult.error);
+    if(followingResult.error) console.error("following取得エラー:",followingResult.error);
+    if(postsResult.error) console.error("posts count取得エラー:",postsResult.error);
+    let isFollowing=false;
+    if(userId!==currentUser.id){
+      const { data, error }=await supabaseClient.from("follows")
+        .select("id").eq("follower_id",currentUser.id).eq("following_id",userId).maybeSingle();
+      if(error) console.error("follow状態取得エラー:",error);
+      isFollowing=!!data;
+    }
+    const followersCount=followersResult.count||0;
+    const followingCount=followingResult.count||0;
+    const postCount=postsResult.count||0;
+    const programUrls=Array.isArray(user.program_urls)?user.program_urls.filter(Boolean):[];
+    const totalViews=Array.isArray(user.program_views)?user.program_views.reduce((sum,v)=>sum+(Number(v)||0),0):0;
+    const totalLikes=Array.isArray(user.program_likes)?user.program_likes.reduce((sum,v)=>sum+(Number(v)||0),0):0;
+    const hasViews=Array.isArray(user.program_views)&&user.program_views.some(v=>v!=null);
+    const hasLikes=Array.isArray(user.program_likes)&&user.program_likes.some(v=>v!=null);
+    let programHTML="";
+    if(programUrls.length){
+      programHTML=`
+        <div class="programStats" style="margin-top:15px;">
+          <h3 style="margin-bottom:10px;">ちゃんプロで公開した作品の総閲覧、いいね数</h3>
+          ${ (hasViews||hasLikes) ? `
+            <div style="display:flex;gap:30px;margin:20px 0;align-items:center;">
+              ${ hasViews ? `<div style="text-align:center;"><div style="font-size:28px;font-weight:700;">👀 ${totalViews.toLocaleString("ja-JP")}</div><div style="font-size:14px;color:#657786;margin-top:3px;">閲覧</div></div>`:"" }
+              ${ hasLikes ? `<div style="text-align:center;"><div style="font-size:28px;font-weight:700;">❤️ ${totalLikes.toLocaleString("ja-JP")}</div><div style="font-size:14px;color:#657786;margin-top:3px;">いいね</div></div>`:"" }
+            </div>`:"" }
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${programUrls.map(url => `
+            <a
+              href="${escapeHTML(url)}"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="display:inline-block;padding:8px 14px;background:#333;color:#fff;text-decoration:none;border-radius:6px;text-align:center;"
+            >作品を見に行く(ctrl+クリック)</a>
+          `).join("")}
+        </div>
+
+        </div>
+      `;
+    }
+    $("profilePage").innerHTML=`
+      <div class="profileCover" style="background-image:url('${escapeHTML(user.cover_url||"")}');"></div>
+      <div class="profileInfo">
+        <img class="profileBigAvatar" src="${escapeHTML(avatarURL(user.icon_url,100))}" onerror="this.src='${escapeHTML(avatarURL("",100))}'">
+        <div class="profileActions">
+          ${ userId===currentUser.id
+            ? `<button class="secondary" onclick="openProfileEdit()">プロフィール編集</button>`
+            : `<div style="display:flex;gap:8px;flex-wrap:wrap;">
+                 <button class="${isFollowing?"secondary":"primary"}" onclick="toggleFollow('${user.id}')">${isFollowing?"フォロー中":"フォロー"}</button>
+                 <button class="secondary" onclick="openDM('${user.id}')">✉️ DM</button>
+               </div>` }
+        </div>
+        <h2>${escapeHTML(user.username||"ユーザー")}</h2>
+        <div class="profileHandle">@${escapeHTML(user.username||"")}</div>
+        <div class="profileBio">${escapeHTML((user.profile||"自己紹介はありません").trim())}</div>
+        ${programHTML}
+        <div class="profileStats">
+          <div class="profileStatClickable" onclick="showFollowList('${user.id}','following')"><b>${followingCount}</b><span>フォロー中</span></div>
+          <div class="profileStatClickable" onclick="showFollowList('${user.id}','followers')"><b>${followersCount}</b><span>フォロワー</span></div>
+          <div><b>${postCount}</b><span>投稿</span></div>
+        </div>
+      </div>
+    `;
+    const { data: userPosts, error: userPostsError }=await supabaseClient.from("posts")
+      .select(`id, user_id, content, image_url, created_at`)
+      .eq("user_id",userId).order("created_at",{ ascending:false }).limit(50);
+    const box=document.createElement("div");
+    box.id="profilePosts";
+    $("profilePage").appendChild(box);
+    if(userPostsError){ console.error("プロフィール投稿取得エラー:",userPostsError); box.innerHTML=`<div class="empty">投稿を取得できませんでした</div>`; return; }
+    if(!userPosts?.length){ box.innerHTML=`<div class="empty">まだ投稿がありません</div>`; return; }
+    const meta=await getPostMeta(userPosts.map(post=>post.id));
+    for(const post of userPosts){ cache.posts.set(post.id,post); box.appendChild(createPostElement(post,user,meta)); }
+  }catch(error){
+    console.error("showUserProfile unexpected error:",error);
+    $("profilePage").innerHTML=`<div class="empty">プロフィールの読み込みに失敗しました</div>`;
+  }
+}
+
+async function showFollowList(userId,type){
+  const user=await getUser(userId);
+  if(!user) return;
+  const isFollowers=type==="followers";
+  const title=isFollowers?"フォロワー":"フォロー中";
+  const column=isFollowers?"following_id":"follower_id";
+  const { data, error }=await supabaseClient.from("follows")
+    .select(`follower_id, following_id`).eq(column,userId);
+  if(error){
+    console.error(error);
+    openModal(`<h2>${title}</h2><div class="empty">一覧を取得できませんでした</div>`);
+    return;
+  }
+  openModal(`<h2>${escapeHTML(user.username)} の${title}</h2><div id="followList"></div>`);
+  const box=$("followList");
+  if(!data?.length){ box.innerHTML=`<div class="empty">${title}はいません</div>`; return; }
+  const targetIds=data.map(item=>isFollowers?item.follower_id:item.following_id);
+  const users=await getUsers(targetIds);
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  const { data: myFollows }=await supabaseClient.from("follows")
+    .select("following_id").eq("follower_id",currentUser.id).in("following_id",targetIds);
+  const followingSet=new Set((myFollows||[]).map(x=>x.following_id));
+  for(const item of data){
+    const targetUserId=isFollowers?item.follower_id:item.following_id;
+    const targetUser=userMap.get(targetUserId);
+    if(!targetUser) continue;
+    const isFollowing=followingSet.has(targetUser.id);
+    const row=document.createElement("div");
+    row.className="userRow";
+    row.innerHTML=`
+      <img class="avatar" src="${avatarURL(targetUser.icon_url,45)}" style="cursor:pointer">
+      <div class="userRowInfo" style="cursor:pointer">
+        <b>${escapeHTML(targetUser.username)}</b>
+        <div class="handle">@${escapeHTML(targetUser.username)}</div>
+      </div>
+      ${ targetUser.id!==currentUser.id ? `<button class="${isFollowing?"secondary":"primary"}">${isFollowing?"フォロー中":"フォロー"}</button>`:"" }
+    `;
+    row.querySelector(".avatar").onclick=()=>{ closeModal(); showUserProfile(targetUser.id); };
+    row.querySelector(".userRowInfo").onclick=()=>{ closeModal(); showUserProfile(targetUser.id); };
+    const button=row.querySelector("button");
+    if(button){ button.onclick=async()=>{ await toggleFollowFromList(targetUser.id,userId,type); }; }
     box.appendChild(row);
   }
 }
 
-
-async function toggleFollowFromList(
-  targetUserId,
-  profileUserId,
-  type
-) {
-  await toggleFollow(
-    targetUserId,
-    false
-  );
-
-  await showFollowList(
-    profileUserId,
-    type
-  );
+async function toggleFollowFromList(targetUserId,profileUserId,type){
+  await toggleFollow(targetUserId,false);
+  await showFollowList(profileUserId,type);
 }
 
-
-async function toggleFollow(
-  userId,
-  reloadProfile = true
-) {
-  if (userId === currentUser.id) {
-    return;
-  }
-
-  const {
-    data
-  } = await supabaseClient
-    .from("follows")
-    .select("id")
-    .eq(
-      "follower_id",
-      currentUser.id
-    )
-    .eq(
-      "following_id",
-      userId
-    )
-    .maybeSingle();
-
-  if (data) {
-    await supabaseClient
-      .from("follows")
-      .delete()
-      .eq("id", data.id);
-
+async function toggleFollow(userId,reloadProfile=true){
+  if(userId===currentUser.id) return;
+  const { data }=await supabaseClient.from("follows")
+    .select("id").eq("follower_id",currentUser.id).eq("following_id",userId).maybeSingle();
+  if(data){
+    await supabaseClient.from("follows").delete().eq("id",data.id);
     toast("フォローを解除しました");
-  } else {
-    await supabaseClient
-      .from("follows")
-      .insert({
-        follower_id: currentUser.id,
-        following_id: userId
-      });
-
-    await createNotification({
-      user_id: userId,
-      actor_id: currentUser.id,
-      type: "follow"
-    });
-
+  }else{
+    await supabaseClient.from("follows").insert({ follower_id:currentUser.id, following_id:userId });
+    await createNotification({ user_id:userId, actor_id:currentUser.id, type:"follow" });
     toast("フォローしました");
   }
-
-  cache.suggestedUsers = null;
-
-  if (reloadProfile) {
-    await showUserProfile(userId);
-  }
+  cache.suggestedUsers=null;
+  if(reloadProfile) await showUserProfile(userId);
 }
 
-
-/* =========================================================
-   Profile edit
-   ========================================================= */
-
-function openProfileEdit() {
-  const programUrl = Array.isArray(currentUser.program_urls)
-    ? (currentUser.program_urls[0] || "")
-    : "";
-
+function openProfileEdit(){
+  const programUrl=Array.isArray(currentUser.program_urls)?(currentUser.program_urls[0]||""):"";
   openModal(`
     <h2>プロフィール編集</h2>
-
-    <input
-      id="editUsername"
-      value="${escapeHTML(currentUser.username)}"
-      placeholder="ユーザー名"
-    >
-
-    <input
-      id="editIcon"
-      value="${escapeHTML(currentUser.icon_url || "")}"
-      placeholder="アイコン画像URL"
-    >
-
-    <input
-      id="editCover"
-      value="${escapeHTML(currentUser.cover_url || "")}"
-      placeholder="プロフィール背景画像URL"
-    >
-
-    <textarea
-      id="editBio"
-      placeholder="自己紹介"
-      style="height:120px"
-    >${escapeHTML(currentUser.profile || "")}</textarea>
-
+    <b>ユーザー変更</b>
+    <input id="editUsername" value="${escapeHTML(currentUser.username)}" placeholder="ユーザー名">
+    <b>アイコン画像URL</b>
+    <input id="editIcon" value="${escapeHTML(currentUser.icon_url||"")}" placeholder="アイコン画像URL">
+    <b>プロフィール背景画像URL</b>
+    <input id="editCover" value="${escapeHTML(currentUser.cover_url||"")}" placeholder="プロフィール背景画像URL">
+    <b>自己紹介</b>
+    <textarea id="editBio" placeholder="自己紹介" style="height:120px">${escapeHTML(currentUser.profile||"")}</textarea>
     <div style="margin-top:15px">
       <b>プログラムURL</b>
-
-      <div class="handle" style="margin:6px 0">
-        chanpro.jpのプログラムプロフィールURLを1つ設定できます
-      </div>
-
-      <input
-        id="editProgramUrl"
-        value="${escapeHTML(programUrl)}"
-        placeholder="https://chanpro.jp/00-program-profile/..."
-      >
+      <div class="handle" style="margin:6px 0">chanpro.jpのプログラムプロフィールURLを1つ設定できます</div>
+      <input id="editProgramUrl" value="${escapeHTML(programUrl)}" placeholder="https://chanpro.jp/00-program-profile/...">
     </div>
-
     <div style="text-align:right;margin-top:10px">
       <button class="secondary" onclick="closeModal()">キャンセル</button>
       <button class="primary" onclick="saveProfileEdit()">保存</button>
     </div>
   `);
 }
-function validProgramUrl(value) {
-  if (!value) return true;
 
-  try {
-    const url = new URL(value);
-
-    return (
-      url.protocol === "https:" &&
-      url.hostname === "chanpro.jp" &&
-      url.pathname.startsWith("/00-program-profile/")
-    );
-  } catch {
-    return false;
-  }
+function validProgramUrl(value){
+  if(!value) return true;
+  try{
+    const url=new URL(value);
+    return url.protocol==="https:" && url.hostname==="chanpro.jp" && url.pathname.startsWith("/00-program-profile/");
+  }catch{ return false; }
+}
+function validHttpUrl(value){
+  if(!value) return true;
+  try{
+    const url=new URL(value);
+    return url.protocol==="http:"||url.protocol==="https:";
+  }catch{ return false; }
 }
 
-function validHttpUrl(value) {
-  if (!value) return true;
-
-  try {
-    const url =
-      new URL(value);
-
-    return (
-      url.protocol === "http:" ||
-      url.protocol === "https:"
-    );
-  } catch {
-    return false;
-  }
-}
-
-
-
-async function saveProfileEdit() {
-  const username = $("editUsername").value.trim();
-  const icon_url = $("editIcon").value.trim();
-  const cover_url = $("editCover").value.trim();
-  const profile = $("editBio").value.trim();
-  const programUrl = $("editProgramUrl").value.trim();
-
-  // =========================
-  // 基本入力チェック
-  // =========================
-  if (!username) {
-    toast("ユーザー名を入力してください");
+async function saveProfileEdit(){
+  const username=$("editUsername").value.trim();
+  const icon_url=$("editIcon").value.trim();
+  const cover_url=$("editCover").value.trim();
+  const profile=$("editBio").value.trim();
+  const programUrl=$("editProgramUrl").value.trim();
+  if(!username){ toast("ユーザー名を入力してください"); return; }
+  if(!validHttpUrl(icon_url)){ toast("アイコン画像URLが正しくありません"); return; }
+  if(!validHttpUrl(cover_url)){ toast("背景URLが正しくありません"); return; }
+  if(programUrl && !validProgramUrl(programUrl)){ toast("chanpro.jpのプログラムプロフィールURLを入力してください"); return; }
+  const program_urls=programUrl?[programUrl]:[];
+  const { data, error }=await supabaseClient.from("users")
+    .update({ username, icon_url, cover_url, profile, program_urls })
+    .eq("id",currentUser.id)
+    .select(`id, username, icon_url, cover_url, profile, program_urls, role, ban_until`).single();
+  if(error){
+    console.error("saveProfileEdit:",error);
+    if(error.code==="23505") toast("そのユーザー名は使用されています");
+    else toast("プロフィールを保存できませんでした");
     return;
   }
-
-  // =========================
-  // アイコンURLチェック
-  // =========================
-  if (!validHttpUrl(icon_url)) {
-    toast("アイコン画像URLが正しくありません");
-    return;
-  }
-
-  // =========================
-  // 背景画像URLチェック
-  // =========================
-  if (!validHttpUrl(cover_url)) {
-    toast("背景URLが正しくありません");
-    return;
-  }
-
-  // =========================
-  // プログラムURLチェック
-  // 空欄は許可
-  // =========================
-  if (programUrl && !validProgramUrl(programUrl)) {
-    toast("chanpro.jpのプログラムプロフィールURLを入力してください");
-    return;
-  }
-
-  // =========================
-  // text[] に保存
-  // 1ユーザーにつき1URL
-  // =========================
-  const program_urls = programUrl
-    ? [programUrl]
-    : [];
-
-  // =========================
-  // Supabaseへ保存
-  // =========================
-  const { data, error } = await supabaseClient
-    .from("users")
-    .update({
-      username,
-      icon_url,
-      cover_url,
-      profile,
-      program_urls
-    })
-    .eq("id", currentUser.id)
-    .select(`
-      id,
-      username,
-      icon_url,
-      cover_url,
-      profile,
-      program_urls,
-      role,
-      ban_until
-    `)
-    .single();
-
-  // =========================
-  // 保存エラー
-  // =========================
-  if (error) {
-    console.error("saveProfileEdit:", error);
-
-    if (error.code === "23505") {
-      toast("そのユーザー名は使用されています");
-    } else {
-      toast("プロフィールを保存できませんでした");
-    }
-
-    return;
-  }
-
-  // =========================
-  // 現在のユーザー情報を更新
-  // =========================
-  currentUser = data;
-  cache.users.set(data.id, data);
-
-  // =========================
-  // モーダルを閉じる
-  // =========================
+  currentUser=data;
+  cache.users.set(data.id,data);
   closeModal();
-
-  // =========================
-  // プロフィールを再表示
-  // =========================
   await showMyProfile();
-
   toast("プロフィールを保存しました");
 }
 
-
-
-/* =========================================================
-   Search
-   ========================================================= */
-
-async function searchAll() {
-  const q =
-    $("searchInput").value.trim();
-
-  if (!q) return;
-
-  if (q.startsWith("#")) {
-    await searchHashtag(
-      q.substring(1)
-    );
-    return;
-  }
-
-  const box =
-    $("searchResults");
-
-  box.innerHTML =
-    `<div class="empty">
-      検索中...
-    </div>`;
-
-  const [
-    usersResult,
-    postsResult
-  ] = await Promise.all([
-    supabaseClient
-      .from("users")
-      .select(`
-        id,
-        username,
-        icon_url,
-        profile
-      `)
-      .ilike(
-        "username",
-        `%${q}%`
-      )
-      .limit(20),
-
-    supabaseClient
-      .from("posts")
-      .select(`
-        id,
-        user_id,
-        content,
-        image_url,
-        created_at
-      `)
-      .ilike(
-        "content",
-        `%${q}%`
-      )
-      .order("created_at", {
-        ascending: false
-      })
-      .limit(30)
+async function searchAll(){
+  const q=$("searchInput").value.trim();
+  if(!q){ $("searchResults").innerHTML='<div class="empty">検索キーワードを入力してください</div>'; return; }
+  if(q.startsWith("#")){ await searchHashtag(q.substring(1)); return; }
+  const box=$("searchResults");
+  box.innerHTML='<div class="empty">検索中...</div>';
+  const [usersResult, postsResult]=await Promise.all([
+    supabaseClient.from("users")
+      .select(`id, username, icon_url, cover_url, profile, role, ban_until, program_urls, program_views, program_likes`)
+      .ilike("username",`%${q}%`).order("username",{ ascending:true }).limit(20),
+    supabaseClient.from("posts")
+      .select(`id, user_id, content, image_url, created_at`)
+      .ilike("content",`%${q}%`).order("created_at",{ ascending:false }).limit(30)
   ]);
-
-  box.innerHTML = "";
-
-  const userTitle =
-    document.createElement("h3");
-
-  userTitle.textContent =
-    "ユーザー";
-
+  box.innerHTML="";
+  const userTitle=document.createElement("h3");
+  userTitle.textContent="ユーザー";
   box.appendChild(userTitle);
-
-  if (usersResult.error) {
-    box.innerHTML +=
-      `<div class="empty">
-        ユーザー検索に失敗しました
-      </div>`;
-  } else if (
-    !usersResult.data?.length
-  ) {
-    box.innerHTML +=
-      `<div class="empty">
-        ユーザーが見つかりません
-      </div>`;
-  } else {
-    for (const user of usersResult.data) {
-      cache.users.set(
-        user.id,
-        user
-      );
-
-      const row =
-        document.createElement("div");
-
-      row.className =
-        "userRow";
-
-      row.innerHTML = `
-        <img
-          class="avatar"
-          src="${avatarURL(
-            user.icon_url,
-            45
-          )}"
-          style="cursor:pointer"
-        >
-
-        <div
-          class="userRowInfo"
-          style="cursor:pointer;flex:1"
-        >
-          <b>
-            ${escapeHTML(user.username)}
-          </b>
-
-          <div class="handle">
-            @${escapeHTML(user.username)}
-          </div>
-        </div>
-      `;
-
-      row.querySelector(
-        ".avatar"
-      ).onclick = () =>
-        showUserProfile(user.id);
-
-      row.querySelector(
-        ".userRowInfo"
-      ).onclick = () =>
-        showUserProfile(user.id);
-
+  if(usersResult.error){
+    console.error("ユーザー検索エラー:",usersResult.error);
+    const error=document.createElement("div"); error.className="empty"; error.textContent="ユーザー検索に失敗しました"; box.appendChild(error);
+  }else if(usersResult.data?.length){
+    for(const user of usersResult.data){
+      cache.users.set(user.id,user);
+      const row=document.createElement("div"); row.className="userRow"; row.style.cursor="pointer";
+      const avatar=document.createElement("img"); avatar.className="avatar"; avatar.src=avatarURL(user.icon_url,45); avatar.style.cursor="pointer";
+      avatar.onerror=()=>{ avatar.src=avatarURL("",45); };
+      const info=document.createElement("div"); info.className="userRowInfo"; info.style.cssText="cursor:pointer;flex:1;";
+      const name=document.createElement("b"); name.textContent=user.username||"ユーザー";
+      const handle=document.createElement("div"); handle.className="handle"; handle.textContent=`@${user.username||""}`;
+      info.appendChild(name); info.appendChild(handle);
+      row.appendChild(avatar); row.appendChild(info);
+      row.addEventListener("click",async()=>{ if(!user.id){ console.error("ユーザーIDがありません:",user); return; } await showUserProfile(user.id); });
       box.appendChild(row);
     }
+  }else{
+    const empty=document.createElement("div"); empty.className="empty"; empty.textContent="ユーザーが見つかりません"; box.appendChild(empty);
   }
-
-  const postTitle =
-    document.createElement("h3");
-
-  postTitle.style.marginTop =
-    "20px";
-
-  postTitle.textContent =
-    "投稿";
-
-  box.appendChild(postTitle);
-
-  if (postsResult.error) {
-    box.innerHTML +=
-      `<div class="empty">
-        投稿検索に失敗しました
-      </div>`;
-
+  const postTitle=document.createElement("h3"); postTitle.style.marginTop="20px"; postTitle.textContent="投稿"; box.appendChild(postTitle);
+  if(postsResult.error){
+    console.error("投稿検索エラー:",postsResult.error);
+    const error=document.createElement("div"); error.className="empty"; error.textContent="投稿検索に失敗しました"; box.appendChild(error);
     return;
   }
-
-  if (!postsResult.data?.length) {
-    box.innerHTML +=
-      `<div class="empty">
-        投稿が見つかりません
-      </div>`;
-
+  if(!postsResult.data?.length){
+    const empty=document.createElement("div"); empty.className="empty"; empty.textContent="投稿が見つかりません"; box.appendChild(empty);
     return;
   }
-
-  const posts =
-    postsResult.data;
-
-  const users =
-    await getUsers(
-      posts.map(post =>
-        post.user_id
-      )
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  const meta =
-    await getPostMeta(
-      posts.map(post => post.id)
-    );
-
-  for (const post of posts) {
-    const user =
-      userMap.get(post.user_id);
-
-    if (!user) continue;
-
-    box.appendChild(
-      createPostElement(
-        post,
-        user,
-        meta
-      )
-    );
+  const posts=postsResult.data;
+  const users=await getUsers(posts.map(post=>post.user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  const meta=await getPostMeta(posts.map(post=>post.id));
+  for(const post of posts){
+    const user=userMap.get(post.user_id);
+    if(!user) continue;
+    cache.posts.set(post.id,post);
+    box.appendChild(createPostElement(post,user,meta));
   }
 }
 
-
-async function searchHashtag(tag) {
+async function searchHashtag(tag){
   hidePages();
-
-  $("searchPage")
-    .classList.remove("hidden");
-
-  const box =
-    $("searchResults");
-
-  box.innerHTML =
-    `<h2>#${escapeHTML(tag)}</h2>
-     <div class="empty">読み込み中...</div>`;
-
-  const {
-    data: links,
-    error
-  } = await supabaseClient
-    .from("post_hashtags")
-    .select("post_id")
-    .eq("hashtag", tag)
-    .limit(50);
-
-  if (error) {
-    box.innerHTML =
-      `<div class="empty">
-        検索できませんでした
-      </div>`;
-
-    return;
-  }
-
-  const postIds =
-    (links || [])
-      .map(x => x.post_id);
-
-  if (!postIds.length) {
-    box.innerHTML =
-      `<h2>#${escapeHTML(tag)}</h2>
-       <div class="empty">
-         投稿がありません
-       </div>`;
-
-    return;
-  }
-
-  const {
-    data: posts
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .in("id", postIds)
-    .order("created_at", {
-      ascending: false
-    });
-
-  const users =
-    await getUsers(
-      (posts || []).map(
-        post => post.user_id
-      )
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  const meta =
-    await getPostMeta(
-      (posts || []).map(
-        post => post.id
-      )
-    );
-
-  box.innerHTML =
-    `<h2>#${escapeHTML(tag)}</h2>`;
-
-  for (const post of posts || []) {
-    const user =
-      userMap.get(post.user_id);
-
-    if (!user) continue;
-
-    box.appendChild(
-      createPostElement(
-        post,
-        user,
-        meta
-      )
-    );
+  $("searchPage").classList.remove("hidden");
+  const box=$("searchResults");
+  box.innerHTML=`<h2>#${escapeHTML(tag)}</h2><div class="empty">読み込み中...</div>`;
+  const { data: links, error }=await supabaseClient.from("post_hashtags")
+    .select("post_id").eq("hashtag",tag).limit(50);
+  if(error){ box.innerHTML=`<div class="empty">検索できませんでした</div>`; return; }
+  const postIds=(links||[]).map(x=>x.post_id);
+  if(!postIds.length){ box.innerHTML=`<h2>#${escapeHTML(tag)}</h2><div class="empty">投稿がありません</div>`; return; }
+  const { data: posts }=await supabaseClient.from("posts")
+    .select(`id, user_id, content, image_url, created_at`).in("id",postIds).order("created_at",{ ascending:false });
+  const users=await getUsers((posts||[]).map(post=>post.user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  const meta=await getPostMeta((posts||[]).map(post=>post.id));
+  box.innerHTML=`<h2>#${escapeHTML(tag)}</h2>`;
+  for(const post of posts||[]){
+    const user=userMap.get(post.user_id);
+    if(!user) continue;
+    box.appendChild(createPostElement(post,user,meta));
   }
 }
 
-
-/* =========================================================
-   Notifications
-   ========================================================= */
-
-async function notifyFollowersAboutPost(postId) {
-  // 投稿IDがない場合は処理しない
-  if (!postId) {
-    console.warn("notifyFollowersAboutPost: postIdがありません");
-    return;
-  }
-
-  // ログインユーザーがいない場合は処理しない
-  if (!currentUser?.id) {
-    console.warn("notifyFollowersAboutPost: currentUserがありません");
-    return;
-  }
-
-  try {
-    // ==========================================
-    // 1. 自分をフォローしているユーザーを取得
-    // ==========================================
-    const { data: followers, error: followersError } =
-      await supabaseClient
-        .from("follows")
-        .select("follower_id")
-        .eq("following_id", currentUser.id);
-
-    if (followersError) {
-      console.error(
-        "notifyFollowersAboutPost: フォロワー取得失敗",
-        followersError
-      );
-      return;
+async function notifyFollowersAboutPost(postId){
+  if(!postId){ console.warn("notifyFollowersAboutPost: postIdがありません"); return; }
+  if(!currentUser?.id){ console.warn("notifyFollowersAboutPost: currentUserがありません"); return; }
+  try{
+    const { data: followers, error: followersError }=await supabaseClient.from("follows")
+      .select("follower_id").eq("following_id",currentUser.id);
+    if(followersError){ console.error("notifyFollowersAboutPost: フォロワー取得失敗",followersError); return; }
+    if(!followers?.length){ return; }
+    const followerIds=[...new Set(followers.map(row=>row.follower_id).filter(userId=>userId && userId!==currentUser.id))];
+    if(!followerIds.length) return;
+    const notifications=followerIds.map(userId=>({ user_id:userId, actor_id:currentUser.id, type:"post", post_id:postId }));
+    const { error: notificationError }=await supabaseClient.from("notifications").insert(notifications);
+    if(notificationError) console.error("notifyFollowersAboutPost: 通知保存失敗",notificationError);
+    for(const followerId of followerIds){
+      mqttPublish(mqttTopicUser(followerId),{ type:"post_created", post_id:postId, user_id:currentUser.id });
     }
-
-    if (!followers?.length) {
-      console.log(
-        "notifyFollowersAboutPost: フォロワーはいません"
-      );
-      return;
-    }
-
-    // ==========================================
-    // 2. 自分自身を除外
-    // ==========================================
-    const followerIds = [
-      ...new Set(
-        followers
-          .map(row => row.follower_id)
-          .filter(
-            userId =>
-              userId &&
-              userId !== currentUser.id
-          )
-      )
-    ];
-
-    if (!followerIds.length) {
-      return;
-    }
-
-    // ==========================================
-    // 3. 通知データを作成
-    // ==========================================
-    const notifications = followerIds.map(userId => ({
-      user_id: userId,
-      actor_id: currentUser.id,
-      type: "post",
-      post_id: postId
-    }));
-
-    // ==========================================
-    // 4. Supabaseに一括保存
-    // ==========================================
-    const { error: notificationError } =
-      await supabaseClient
-        .from("notifications")
-        .insert(notifications);
-
-    if (notificationError) {
-      console.error(
-        "notifyFollowersAboutPost: 通知保存失敗",
-        notificationError
-      );
-    }
-
-    // ==========================================
-    // 5. MQTTで各フォロワーへリアルタイム通知
-    // ==========================================
-    for (const followerId of followerIds) {
-      mqttPublish(
-        mqttTopicUser(followerId),
-        {
-          type: "post_created",
-          post_id: postId,
-          user_id: currentUser.id
-        }
-      );
-    }
-
-    console.log(
-      `投稿通知送信完了: ${followerIds.length}人`,
-      {
-        postId,
-        userId: currentUser.id,
-        followerIds
-      }
-    );
-
-  } catch (error) {
-    console.error(
-      "notifyFollowersAboutPost: 予期しないエラー",
-      error
-    );
-  }
+  }catch(error){ console.error("notifyFollowersAboutPost: 予期しないエラー",error); }
 }
 
-
-async function createNotificationForPost(
-  postId,
-  type
-) {
-  const post =
-    cache.posts.get(postId);
-
-  let targetUserId =
-    post?.user_id;
-
-  if (!targetUserId) {
-    const { data } =
-      await supabaseClient
-        .from("posts")
-        .select("user_id")
-        .eq("id", postId)
-        .maybeSingle();
-
-    targetUserId =
-      data?.user_id;
+async function createNotificationForPost(postId,type){
+  const post=cache.posts.get(postId);
+  let targetUserId=post?.user_id;
+  if(!targetUserId){
+    const { data }=await supabaseClient.from("posts").select("user_id").eq("id",postId).maybeSingle();
+    targetUserId=data?.user_id;
   }
-
-  if (!targetUserId) return;
-
-  if (
-    targetUserId ===
-    currentUser.id
-  ) {
-    return;
-  }
-
-  await createNotification({
-    user_id: targetUserId,
-    actor_id: currentUser.id,
-    type,
-    post_id: postId
-  });
+  if(!targetUserId) return;
+  if(targetUserId===currentUser.id) return;
+  await createNotification({ user_id:targetUserId, actor_id:currentUser.id, type, post_id:postId });
 }
 
-
-async function createNotification(
-  notification
-) {
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("notifications")
-    .insert(notification)
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error(
-      "notification:",
-      error
-    );
-
-    return null;
-  }
-
-  /*
-   * 20件を超えた時だけ古い通知を削除。
-   */
-  const {
-    data: notifications
-  } = await supabaseClient
-    .from("notifications")
-    .select("id")
-    .eq(
-      "user_id",
-      notification.user_id
-    )
-    .order("created_at", {
-      ascending: false
-    })
-    .range(20, 100);
-
-  const oldIds =
-    (notifications || [])
-      .map(x => x.id);
-
-  if (oldIds.length) {
-    await supabaseClient
-      .from("notifications")
-      .delete()
-      .in("id", oldIds);
-  }
-
+async function createNotification(notification){
+  const { data, error }=await supabaseClient.from("notifications").insert(notification).select("id").single();
+  if(error){ console.error("notification:",error); return null; }
+  const { data: notifications }=await supabaseClient.from("notifications")
+    .select("id").eq("user_id",notification.user_id).order("created_at",{ ascending:false }).range(20,100);
+  const oldIds=(notifications||[]).map(x=>x.id);
+  if(oldIds.length){ await supabaseClient.from("notifications").delete().in("id",oldIds); }
   return data;
 }
+async function loadHome(){
+  const box = $("homePosts");
 
-
-async function loadNotifications() {
-  const box =
-    $("notifications");
-
-  box.innerHTML =
-    `<div class="empty">
-      読み込み中...
-    </div>`;
-
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("notifications")
-    .select(`
-      id,
-      user_id,
-      actor_id,
-      type,
-      post_id,
-      message_id,
-      created_at
-    `)
-    .eq(
-      "user_id",
-      currentUser.id
-    )
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(50);
-
-  if (error) {
-    console.error(error);
-
-    box.innerHTML =
-      `<div class="empty">
-        取得失敗
-      </div>`;
-
+  if(!box){
+    console.error("homePosts が見つかりません");
     return;
   }
 
-  if (!data?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        通知はありません
-      </div>`;
-
-    return;
-  }
-
-  /*
-   * actorを一括取得
-   */
-  const actors =
-    await getUsers(
-      data.map(n => n.actor_id)
-    );
-
-  const actorMap =
-    new Map(
-      actors.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  /*
-   * DM通知だけmessageを一括取得
-   */
-  const messageIds =
-    data
-      .filter(n =>
-        n.type === "message" &&
-        n.message_id
-      )
-      .map(n => n.message_id);
-
-  let messageMap =
-    new Map();
-
-  if (messageIds.length) {
-    const {
-      data: messages
-    } = await supabaseClient
-      .from("messages")
-      .select(`
-        id,
-        content
-      `)
-      .in("id", messageIds);
-
-    messageMap =
-      new Map(
-        (messages || []).map(
-          message => [
-            message.id,
-            message
-          ]
-        )
-      );
-  }
-
-  box.innerHTML = "";
-
-  for (const n of data) {
-    const actor =
-      actorMap.get(n.actor_id);
-
-    if (n.type === "message") {
-      const message =
-        messageMap.get(
-          n.message_id
-        );
-
-      const notification =
-        document.createElement("div");
-
-      notification.className =
-        "notification";
-
-      notification.innerHTML = `
-        <div
-          style="cursor:pointer"
-          onclick="
-            openDMFromNotification(
-              '${actor?.id || ""}'
-            )
-          "
-        >
-
-          <b>
-            ${escapeHTML(
-              actor?.username ||
-              "ユーザー"
-            )}
-          </b>
-
-          <span>
-            からDMが届きました
-          </span>
-
-          ${
-            message
-              ? `
-                <div
-                  style="
-                    margin-top:6px;
-                    padding:10px;
-                    background:#f5f8fa;
-                    border-radius:10px;
-                  "
-                >
-                  ${escapeHTML(
-                    message.content
-                  )}
-                </div>
-              `
-              : ""
-          }
-
-          <div class="handle">
-            ${formatDate(n.created_at)}
-          </div>
-
-        </div>
-      `;
-
-      box.appendChild(
-        notification
-      );
-
-      continue;
-    }
-
-        
-    
-    let text = "通知";
-    
-    if (n.type === "like") {
-      text = "あなたの投稿にいいねしました";
-    }
-    
-    if (n.type === "reply") {
-      text = "あなたの投稿に返信しました";
-    }
-    
-    if (n.type === "repost") {
-      text = "あなたの投稿をリポストしました";
-    }
-    
-    if (n.type === "follow") {
-      text = "あなたをフォローしました";
-    }
-    
-    if (n.type === "post") {
-      text = "新しい投稿をしました";
-    }
-    
-    const notification = document.createElement("div");
-    notification.className = "notification";
-    
-    const clickable =
-      (n.type === "reply" || n.type === "post") && n.post_id;
-    
-    notification.innerHTML = `
-      <div
-        ${clickable
-          ? `style="cursor:pointer"
-             onclick="openReplyFromNotification('${n.post_id}')"`
-          : ""}
-      >
-        <b>${escapeHTML(actor?.username || "ユーザー")}</b>
-        ${escapeHTML(text)}
-    
-        <div class="handle">
-          ${formatDate(n.created_at)}
-        </div>
-      </div>
-    `;
-    
-    box.appendChild(notification);
-
-
-  }
-}
-
-
-/* =========================================================
-   DM
-   ========================================================= */
-
-function mqttTopicUser(userId) {
-    return `chanpro-post/user/${userId}`;
-}
-
-function mqttTopicGlobal() {
-    return "chanpro-post/global";
-}
-
-function connectMQTT() {
-    if (!currentUser) return;
-
-    // 既存接続があれば終了
-    if (mqttClient) {
-        try {
-            mqttClient.end(true);
-        } catch {}
-        mqttClient = null;
-    }
-
-    const clientId =
-        `chanpro-post-${currentUser.id}-${Date.now()}-${Math.random()
-            .toString(16)
-            .slice(2)}`;
-
-    mqttClient = mqtt.connect(MQTT_BROKER, {
-        clientId,
-        clean: true,
-        reconnectPeriod: 3000,
-        connectTimeout: 10000
-    });
-
-    mqttClient.on("connect", () => {
-        console.log("MQTT接続成功");
-
-        // 自分宛てのイベント
-        mqttClient.subscribe(
-            mqttTopicUser(currentUser.id),
-            { qos: 0 },
-            (error) => {
-                if (error) {
-                    console.error("MQTT subscribe user:", error);
-                } else {
-                    console.log(
-                        "MQTT購読:",
-                        mqttTopicUser(currentUser.id)
-                    );
-                }
-            }
-        );
-
-        // 投稿・いいね等の全体イベント
-        mqttClient.subscribe(
-            mqttTopicGlobal(),
-            { qos: 0 },
-            (error) => {
-                if (error) {
-                    console.error("MQTT subscribe global:", error);
-                } else {
-                    console.log(
-                        "MQTT購読:",
-                        mqttTopicGlobal()
-                    );
-                }
-            }
-        );
-    });
-
-    mqttClient.on("reconnect", () => {
-        console.log("MQTT再接続中...");
-    });
-
-    mqttClient.on("error", (error) => {
-        console.error("MQTT error:", error);
-    });
-
-    mqttClient.on("offline", () => {
-        console.log("MQTT offline");
-    });
-
-    mqttClient.on("message", async (topic, payload) => {
-        try {
-            const event = JSON.parse(payload.toString());
-
-            console.log("MQTT受信:", topic, event);
-
-            await handleMQTTEvent(event);
-        } catch (error) {
-            console.error("MQTT message error:", error);
-        }
-    });
-}
-
-function mqttPublish(topic, event) {
-    if (!mqttClient) return;
-
-    if (!mqttClient.connected) {
-        console.log("MQTT未接続のため送信をスキップ");
-        return;
-    }
-
-    mqttClient.publish(
-        topic,
-        JSON.stringify(event),
-        {
-            qos: 0,
-            retain: false
-        }
-    );
-}
-
-async function handleMQTTEvent(event) {
-    if (!currentUser) return;
-
-    // =========================
-    // DM
-    // =========================
-    if (event.type === "message") {
-        if (!event.message_id) return;
-
-        // 自分が送ったDMは無視
-        if (event.sender_id === currentUser.id) {
-            return;
-        }
-
-        // 自分宛てでなければ無視
-        if (event.receiver_id !== currentUser.id) {
-            return;
-        }
-
-        // 現在開いているDMの相手から届いた場合
-        if (
-            currentDMUser &&
-            currentDMUser.id === event.sender_id &&
-            $("dmMessages")
-        ) {
-            const { data: message, error } =
-                await supabaseClient
-                    .from("messages")
-                    .select(`
-                        id,
-                        sender_id,
-                        receiver_id,
-                        content,
-                        created_at
-                    `)
-                    .eq("id", event.message_id)
-                    .maybeSingle();
-
-            if (error) {
-                console.error("DM取得:", error);
-                return;
-            }
-
-            if (!message) return;
-
-            // 重複表示防止
-            const exists = document.querySelector(
-                `[data-dm-message-id="${message.id}"]`
-            );
-
-            if (exists) return;
-
-            appendDMMessage(message);
-
-            const messagesBox = $("dmMessages");
-
-            if (messagesBox) {
-                messagesBox.scrollTop =
-                    messagesBox.scrollHeight;
-            }
-
-            toast("新しいDM");
-        }
-
-        // DM一覧なら即更新
-        if (
-            !$("messagesPage")
-                .classList
-                .contains("hidden") &&
-            !currentDMUser
-        ) {
-            await loadDMs();
-        }
-
-        return;
-    }
-
-    // =========================
-    // 新規投稿
-    // =========================
-    if (event.type === "post_created") {
-        if (
-            !$("homePage")
-                .classList
-                .contains("hidden")
-        ) {
-            await loadHome();
-        }
-
-        return;
-    }
-
-    // =========================
-    // 投稿削除
-    // =========================
-    if (event.type === "post_deleted") {
-        cache.posts.delete(event.post_id);
-
-        if (
-            !$("homePage")
-                .classList
-                .contains("hidden")
-        ) {
-            await loadHome();
-        }
-
-        return;
-    }
-
-    // =========================
-    // フォロー
-    // =========================
-    if (event.type === "follow") {
-        cache.suggestedUsers = null;
-
-        if (
-            !$("profilePage")
-                .classList
-                .contains("hidden")
-        ) {
-            await showUserProfile(currentUser.id);
-        }
-
-        return;
-    }
-
-    // =========================
-    // いいね・リポスト
-    // =========================
-    if (
-        event.type === "like" ||
-        event.type === "repost"
-    ) {
-        if (
-            !$("homePage")
-                .classList
-                .contains("hidden")
-        ) {
-            await loadHome();
-        }
-
-        return;
-    }
-}
-
-function subscribeDMRealtime() {
-    if (dmChannel) {
-        supabaseClient.removeChannel(dmChannel);
-        dmChannel = null;
-    }
-
-    if (!currentUser) return;
-
-    dmChannel = supabaseClient
-        .channel(`dm-realtime-${currentUser.id}`)
-        .on(
-            "postgres_changes",
-            {
-                event: "INSERT",
-                schema: "public",
-                table: "messages",
-                filter: `receiver_id=eq.${currentUser.id}`
-            },
-            async (payload) => {
-                const message = payload.new;
-
-                // DM画面を開いている相手からのメッセージなら即表示
-                if (
-                    currentDMUser &&
-                    message.sender_id === currentDMUser.id &&
-                    $("dmMessages")
-                ) {
-                    appendDMMessage(message);
-
-                    const messagesBox = $("dmMessages");
-                    messagesBox.scrollTop = messagesBox.scrollHeight;
-                }
-
-                // DM一覧を開いている場合は更新
-                if (
-                    !$("messagesPage").classList.contains("hidden") &&
-                    !currentDMUser
-                ) {
-                    await loadDMs();
-                }
-
-                // 通知ページを開いている場合も更新
-                if (
-                    !$("notificationPage").classList.contains("hidden")
-                ) {
-                    await loadNotifications();
-                }
-            }
-        )
-        .subscribe((status) => {
-            console.log("DM Realtime:", status);
-        });
-}
-
-async function loadDMs() {
-  currentDMUser = null;
-
-  const box=$("dmContent");
-
-  box.innerHTML =
-    `<div class="empty">
-      DM一覧を読み込み中...
-    </div>`;
-
-  const {
-    data: messages,
-    error
-  } = await supabaseClient
-    .from("messages")
-    .select(`
-      id,
-      sender_id,
-      receiver_id,
-      content,
-      created_at
-    `)
-    .or(
-      `sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`
-    )
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(200);
-
-  if (error) {
-    console.error(error);
-
-    box.innerHTML =
-      `<div class="empty">
-        DM一覧を取得できませんでした
-      </div>`;
-
-    return;
-  }
-
-  const conversations =
-    new Map();
-
-  for (const message of messages || []) {
-    const otherUserId =
-      message.sender_id ===
-      currentUser.id
-        ? message.receiver_id
-        : message.sender_id;
-
-    if (!otherUserId) continue;
-
-    if (
-      !conversations.has(
-        otherUserId
-      )
-    ) {
-      conversations.set(
-        otherUserId,
-        message
-      );
-    }
-  }
-
-  if (!conversations.size) {
-    box.innerHTML =
-      `<div class="empty">
-        まだDMはありません
-      </div>`;
-
-    return;
-  }
-
-  const users =
-    await getUsers(
-      [...conversations.keys()]
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  box.innerHTML = "";
-
-  for (
-    const [
-      userId,
-      message
-    ] of conversations
-  ) {
-    const user =
-      userMap.get(userId);
-
-    if (!user) continue;
-
-    const row =
-      document.createElement("div");
-
-    row.className =
-      "userRow";
-
-    row.style.cursor =
-      "pointer";
-
-    row.innerHTML = `
-      <img
-        class="avatar"
-        src="${avatarURL(
-          user.icon_url,
-          50
-        )}"
-      >
-
-      <div
-        class="userRowInfo"
-        style="flex:1"
-      >
-        <b>
-          ${escapeHTML(
-            user.username
-          )}
-        </b>
-
-        <div
-          class="handle"
-          style="
-            margin-top:4px;
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
-          "
-        >
-          ${escapeHTML(
-            message.content || ""
-          )}
-        </div>
-
-        <div
-          class="handle"
-          style="margin-top:3px"
-        >
-          ${formatDate(
-            message.created_at
-          )}
-        </div>
-      </div>
-    `;
-
-    row.onclick = () =>
-      openDM(user.id);
-
-    box.appendChild(row);
-  }
-}
-
-
-async function openDM(userId) {
-  const user =
-    await getUser(userId);
-
-  if (!user) {
-    toast("ユーザーが見つかりません");
-    return;
-  }
-
-  currentDMUser =
-    user;
-
-  hidePages();
-
-  $("messagesPage")
-    .classList.remove("hidden");
-
-  $("dmContent").innerHTML = `
-    <div class="empty">
-      DMを読み込み中...
-    </div>
-  `;
-
-  const {
-    data: messages,
-    error
-  } = await supabaseClient
-    .from("messages")
-    .select(`
-      id,
-      sender_id,
-      receiver_id,
-      content,
-      created_at
-    `)
-    .or(
-      `and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id})`
-    )
-    .order("created_at", {
-      ascending: true
-    });
-
-  if (error) {
-    console.error(
-      "DM取得エラー:",
-      error
-    );
-
-    $("dmContent").innerHTML =
-      `<div class="empty">
-        DMを取得できませんでした
-      </div>`;
-
-    return;
-  }
-
-  $("dmContent").innerHTML = `
-    <div
-      class="pageHeader"
-      style="
-        display:flex;
-        align-items:center;
-        gap:10px;
-      "
-    >
-
-      <button
-        class="secondary"
-        onclick="loadDMs()"
-        style="padding:6px 10px"
-      >
-        ←
-      </button>
-
-      <div
-        style="
-          display:flex;
-          align-items:center;
-          gap:10px;
-          cursor:pointer;
-          flex:1;
-        "
-        onclick="showUserProfile('${user.id}')"
-      >
-
-        <img
-          class="avatar"
-          src="${avatarURL(
-            user.icon_url,
-            40
-          )}"
-          style="
-            width:40px;
-            height:40px;
-          "
-        >
-
-        <div>
-          <b>
-            ${escapeHTML(
-              user.username
-            )}
-          </b>
-
-          <div
-            class="handle"
-            style="font-size:12px"
-          >
-            @${escapeHTML(
-              user.username
-            )}
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <div
-      id="dmMessages"
-      class="dmMessages"
-      style="
-        min-height:300px;
-        max-height:60vh;
-        overflow-y:auto;
-        padding:15px;
-      "
-    ></div>
-
-    <div
-      style="
-        padding:10px;
-        display:flex;
-        gap:8px;
-        border-top:1px solid #e1e8ed;
-        background:#fff;
-      "
-    >
-
-      <input
-        id="dmInput"
-        style="
-          flex:1;
-          padding:11px 15px;
-          border:1px solid #ccd6dd;
-          border-radius:22px;
-          outline:none;
-        "
-        placeholder="${escapeHTML(
-          user.username
-        )} にメッセージ"
-        onkeydown="
-          if(
-            event.key === 'Enter' &&
-            !event.shiftKey
-          ){
-            event.preventDefault();
-            sendDM();
-          }
-        "
-      >
-
-      <button
-        class="primary"
-        onclick="sendDM()"
-      >
-        送信
-      </button>
-
-    </div>
-  `;
-
-  const messagesBox =
-    $("dmMessages");
-
-  if (!messages?.length) {
-    messagesBox.innerHTML = `
-      <div
-        class="empty"
-        style="
-          padding:50px 10px;
-          text-align:center;
-        "
-      >
-        まだメッセージはありません
-
-        <br>
-
-        <span
-          style="
-            font-size:13px;
-            color:#657786;
-          "
-        >
-          最初のメッセージを送ってみましょう
-        </span>
-      </div>
-    `;
-  } else {
-    for (const message of messages) {
-      appendDMMessage(
-        message
-      );
-    }
-  }
-
-  messagesBox.scrollTop =
-    messagesBox.scrollHeight;
-
-  setTimeout(() => {
-    $("dmInput")?.focus();
-  }, 100);
-}
-
-
-function appendDMMessage(message) {
-    const messagesBox = $("dmMessages");
-    if (!messagesBox) return;
-
-    // 同じメッセージを二重表示しない
-    if (message.id) {
-        const existing = document.querySelector(
-            `[data-dm-message-id="${message.id}"]`
-        );
-
-        if (existing) return;
-    }
-
-    const isMine =
-        message.sender_id === currentUser.id;
-
-    const div = document.createElement("div");
-
-    if (message.id) {
-        div.dataset.dmMessageId = message.id;
-    }
-
-  div.style.cssText = `
-    margin:6px 0;
-    padding:10px 14px;
-    border-radius:18px;
-    max-width:75%;
-    width:fit-content;
-    white-space:pre-wrap;
-    word-break:break-word;
-    ${
-      isMine
-        ? `
-          margin-left:auto;
-          background:#1d9bf0;
-          color:white;
-        `
-        : `
-          margin-right:auto;
-          background:#eff3f4;
-          color:#0f1419;
-        `
-    }
-  `;
-
-  div.textContent =
-    message.content;
-
-  messagesBox.appendChild(div);
-}
-
-
-async function sendDM() {
-    if (!currentDMUser) return;
-
-    const input = $("dmInput");
-    const content = input.value.trim();
-
-    if (!content) return;
-
-    const { data: message, error } =
-        await supabaseClient
-            .from("messages")
-            .insert({
-                sender_id: currentUser.id,
-                receiver_id: currentDMUser.id,
-                content
-            })
-            .select(`
-                id,
-                sender_id,
-                receiver_id,
-                content,
-                created_at
-            `)
-            .single();
-
-    if (error) {
-        console.error(error);
-        toast("DM送信失敗");
-        return;
-    }
-
-    // 自分の画面には即表示
-    appendDMMessage(message);
-
-    // 相手へMQTT通知
-    mqttPublish(
-        mqttTopicUser(currentDMUser.id),
-        {
-            type: "message",
-            message_id: message.id,
-            sender_id: currentUser.id,
-            receiver_id: currentDMUser.id
-        }
-    );
-
-    // 通知もDBに保存
-    if (currentDMUser.id !== currentUser.id) {
-        await supabaseClient
-            .from("notifications")
-            .insert({
-                user_id: currentDMUser.id,
-                actor_id: currentUser.id,
-                type: "message",
-                message_id: message.id
-            });
-    }
-
-    input.value = "";
-
-    const messagesBox = $("dmMessages");
-
-    if (messagesBox) {
-        messagesBox.scrollTop =
-            messagesBox.scrollHeight;
-    }
-}
-
-
-/* =========================================================
-   Trends
-   ========================================================= */
-
-async function loadTrends() {
-  const box =
-    $("trends");
-
-  /*
-   * ログイン中に何度も取得しない。
-   */
-  if (cache.trends) {
-    renderTrends(
-      cache.trends
-    );
-    return;
-  }
-
-  const {
-    data,
-    error
-  } = await supabaseClient
-    .from("post_hashtags")
-    .select("hashtag")
-    .limit(1000);
-
-  if (error) {
-    console.error(error);
-
-    box.innerHTML =
-      `<div class="empty">
-        トレンドを取得できませんでした
-      </div>`;
-
-    return;
-  }
-
-  const counts =
-    new Map();
-
-  for (const row of data || []) {
-    counts.set(
-      row.hashtag,
-      (counts.get(row.hashtag) || 0) + 1
-    );
-  }
-
-  const trends =
-    [...counts.entries()]
-      .map(([tag, count]) => ({
-        tag,
-        count
-      }))
-      .sort(
-        (a, b) =>
-          b.count - a.count
-      )
-      .slice(0, 3);
-
-  cache.trends =
-    trends;
-
-  renderTrends(
-    trends
-  );
-}
-
-
-function renderTrends(trends) {
-  const box =
-    $("trends");
-
-  box.innerHTML = "";
-
-  if (!trends?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        まだトレンドがありません
-      </div>`;
-
-    return;
-  }
-
-  for (const trend of trends) {
-    const row =
-      document.createElement("div");
-
-    row.className =
-      "trend";
-
-    row.innerHTML = `
-      <b>
-        #${escapeHTML(
-          trend.tag
-        )}
-      </b>
-
-      <small>
-        ${trend.count}件の投稿
-      </small>
-    `;
-
-    row.onclick = () =>
-      searchHashtag(
-        trend.tag
-      );
-
-    box.appendChild(row);
-  }
-}
-
-
-/* =========================================================
-   Suggested users
-   ========================================================= */
-
-async function loadSuggestedUsers() {
-  const box =
-    $("suggestedUsers");
-
-  const {
-    data: users
-  } = await supabaseClient
-    .from("users")
-    .select(`
-      id,
-      username,
-      icon_url
-    `)
-    .neq(
-      "id",
-      currentUser.id
-    )
-    .limit(5);
-
-  if (!users?.length) {
-    box.innerHTML = "";
-    return;
-  }
-
-  /*
-   * 5人それぞれにSELECTするのをやめる。
-   */
-  const {
-    data: follows
-  } = await supabaseClient
-    .from("follows")
-    .select("following_id")
-    .eq(
-      "follower_id",
-      currentUser.id
-    )
-    .in(
-      "following_id",
-      users.map(user => user.id)
-    );
-
-  const followingSet =
-    new Set(
-      (follows || [])
-        .map(x => x.following_id)
-    );
-
-  box.innerHTML = "";
-
-  for (const user of users) {
-    cache.users.set(
-      user.id,
-      user
-    );
-
-    const isFollowing =
-      followingSet.has(
-        user.id
-      );
-
-    const row =
-      document.createElement("div");
-
-    row.className =
-      "userRow";
-
-    row.innerHTML = `
-      <img
-        class="avatar"
-        src="${avatarURL(
-          user.icon_url,
-          45
-        )}"
-        style="cursor:pointer"
-      >
-
-      <div
-        class="userRowInfo"
-        style="
-          cursor:pointer;
-          flex:1
-        "
-      >
-        <b>
-          ${escapeHTML(
-            user.username
-          )}
-        </b>
-
-        <div class="handle">
-          @${escapeHTML(
-            user.username
-          )}
-        </div>
-      </div>
-
-      <button
-        class="${
-          isFollowing
-            ? "secondary"
-            : "primary"
-        }"
-      >
-        ${
-          isFollowing
-            ? "フォロー中"
-            : "フォロー"
-        }
-      </button>
-    `;
-
-    row.querySelector(
-      ".avatar"
-    ).onclick = () =>
-      showUserProfile(user.id);
-
-    row.querySelector(
-      ".userRowInfo"
-    ).onclick = () =>
-      showUserProfile(user.id);
-
-    row.querySelector(
-      "button"
-    ).onclick = async () => {
-      await toggleFollow(
-        user.id,
-        false
-      );
-
-      await loadSuggestedUsers();
-    };
-
-    box.appendChild(row);
-  }
-}
-
-
-/* =========================================================
-   Reports
-   ========================================================= */
-
-async function reportPost(
-  postId,
-  userId
-) {
-  const reason =
-    prompt(
-      "通報理由を入力してください"
-    );
-
-  if (!reason) return;
-
-  const {
-    error
-  } = await supabaseClient
-    .from("reports")
-    .insert({
-      reporter_id:
-        currentUser.id,
-      target_user_id:
-        userId,
-      post_id:
-        postId,
-      reason
-    });
-
-  if (error) {
-    console.error(error);
-    toast("通報できませんでした");
-    return;
-  }
-
-  toast("通報しました");
-}
-
-
-/* =========================================================
-   Admin
-   ========================================================= */
-
-/*
- * is_admin は完全に使用しない。
- *
- * users.role === "admin"
- * のみを使用。
- */
-function checkAdmin() {
-  const isAdmin =
-    currentUser?.role === "admin";
-
-  $("adminNav")
-    .classList.toggle(
-      "hidden",
-      !isAdmin
-    );
-}
-
-
-async function loadAdmin() {
-  if (
-    currentUser?.role !== "admin"
-  ) {
-    $("adminContent").innerHTML =
-      `<div class="empty">
-        管理者権限がありません
-      </div>`;
-
-    return;
-  }
-
-  const [
-    usersResult,
-    postsResult,
-    reportsResult
-  ] = await Promise.all([
-    supabaseClient
-      .from("users")
-      .select("*", {
-        count: "exact",
-        head: true
-      }),
-
-    supabaseClient
-      .from("posts")
-      .select("*", {
-        count: "exact",
-        head: true
-      }),
-
-    supabaseClient
-      .from("reports")
-      .select("*", {
-        count: "exact",
-        head: true
-      })
-      .eq(
-        "status",
-        "open"
-      )
-  ]);
-
-  $("adminContent").innerHTML = `
-    <div class="admin">
-
-      <h2>
-        管理者ダッシュボード
-      </h2>
-
-      <div class="card">
-        <b>ユーザー</b>
-        <h2>
-          ${usersResult.count || 0}
-        </h2>
-      </div>
-
-      <div class="card">
-        <b>投稿</b>
-        <h2>
-          ${postsResult.count || 0}
-        </h2>
-      </div>
-
-      <div class="card">
-        <b>未処理通報</b>
-        <h2>
-          ${reportsResult.count || 0}
-        </h2>
-      </div>
-
-      <hr>
-
-      <button
-        class="primary"
-        onclick="adminUsers()"
-      >
-        ユーザー管理
-      </button>
-
-      <button
-        class="secondary"
-        onclick="adminPosts()"
-      >
-        投稿管理
-      </button>
-
-      <button
-        class="secondary"
-        onclick="adminReports()"
-      >
-        通報管理
-      </button>
-
-    </div>
-  `;
-}
-
-
-async function adminUsers() {
-  const {
-    data
-  } = await supabaseClient
-    .from("users")
-    .select(`
-      id,
-      username,
-      role,
-      created_at,
-      ban_until
-    `)
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(200);
-
-  $("adminContent").innerHTML = `
-    <div class="admin">
-
-      <h2>ユーザー管理</h2>
-
-      <button
-        class="secondary"
-        onclick="loadAdmin()"
-      >
-        戻る
-      </button>
-
-      <div id="adminUserList"></div>
-
-    </div>
-  `;
-
-  const box =
-    $("adminUserList");
-
-  for (const user of data || []) {
-    box.innerHTML += `
-      <div class="adminRow">
-
-        <b>
-          ${escapeHTML(
-            user.username
-          )}
-        </b>
-
-        <div class="handle">
-          ID: ${user.id}
-        </div>
-
-        <div
-          style="margin-top:8px"
-        >
-
-          <button
-            class="secondary"
-            onclick="
-              adminChangeRole(
-                '${user.id}'
-              )
-            "
-          >
-            権限変更
-          </button>
-
-          <button
-            class="danger"
-            onclick="
-              adminBan(
-                '${user.id}'
-              )
-            "
-          >
-            BAN
-          </button>
-
-          <button
-            class="danger"
-            onclick="
-              adminDeleteUser(
-                '${user.id}'
-              )
-            "
-          >
-            削除
-          </button>
-
-        </div>
-      </div>
-    `;
-  }
-}
-
-
-async function adminChangeRole(userId) {
-  const role =
-    prompt(
-      "権限を入力：admin または user"
-    );
-
-  if (
-    role !== "admin" &&
-    role !== "user"
-  ) {
-    return;
-  }
-
-  const {
-    error
-  } = await supabaseClient
-    .from("users")
-    .update({ role })
-    .eq("id", userId);
-
-  if (error) {
-    toast("権限変更失敗");
-    return;
-  }
-
-  toast("権限を変更しました");
-
-  await adminUsers();
-}
-
-
-async function adminBan(userId) {
-  const minutes =
-    Number(
-      prompt(
-        "BAN時間（分）",
-        "60"
-      )
-    );
-
-  if (
-    !minutes ||
-    minutes < 1
-  ) {
-    return;
-  }
-
-  const until =
-    new Date(
-      Date.now() +
-      minutes * 60 * 1000
-    ).toISOString();
-
-  const {
-    error
-  } = await supabaseClient
-    .from("users")
-    .update({
-      ban_until: until
-    })
-    .eq("id", userId);
-
-  if (error) {
-    console.error(error);
-    toast("BAN失敗");
-    return;
-  }
-
-  toast("BANしました");
-}
-
-
-async function adminDeleteUser(userId) {
-  if (
-    !confirm(
-      "このユーザーを削除しますか？"
-    )
-  ) {
-    return;
-  }
-
-  const {
-    error
-  } = await supabaseClient
-    .from("users")
-    .delete()
-    .eq("id", userId);
-
-  if (error) {
-    toast("削除失敗");
-    console.error(error);
-    return;
-  }
-
-  cache.users.delete(
-    userId
-  );
-
-  toast("ユーザーを削除しました");
-
-  await adminUsers();
-}
-
-
-async function adminPosts() {
-  const {
-    data
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      created_at
-    `)
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(200);
-
-  const users =
-    await getUsers(
-      (data || []).map(
-        post => post.user_id
-      )
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  $("adminContent").innerHTML = `
-    <div class="admin">
-
-      <h2>投稿管理</h2>
-
-      <button
-        class="secondary"
-        onclick="loadAdmin()"
-      >
-        戻る
-      </button>
-
-      <div id="adminPostList"></div>
-
-    </div>
-  `;
-
-  const box =
-    $("adminPostList");
-
-  for (const post of data || []) {
-    const user =
-      userMap.get(
-        post.user_id
-      );
-
-    box.innerHTML += `
-      <div class="adminRow">
-
-        <b>
-          ${escapeHTML(
-            user?.username || ""
-          )}
-        </b>
-
-        <div>
-          ${escapeHTML(
-            post.content || ""
-          )}
-        </div>
-
-        <button
-          class="danger"
-          onclick="
-            adminDeletePost(
-              '${post.id}'
-            )
-          "
-        >
-          投稿削除
-        </button>
-
-      </div>
-    `;
-  }
-}
-
-
-async function adminDeletePost(postId) {
-  if (
-    !confirm(
-      "この投稿を削除しますか？"
-    )
-  ) {
-    return;
-  }
-
-  const {
-    error
-  } = await supabaseClient
-    .from("posts")
-    .delete()
-    .eq("id", postId);
-
-  if (error) {
-    toast("削除失敗");
-    return;
-  }
-
-  cache.posts.delete(
-    postId
-  );
-
-  toast("削除しました");
-
-  await adminPosts();
-}
-
-
-async function adminReports() {
-  const {
-    data
-  } = await supabaseClient
-    .from("reports")
-    .select(`
-      id,
-      target_user_id,
-      post_id,
-      reason,
-      status,
-      created_at
-    `)
-    .eq(
-      "status",
-      "open"
-    )
-    .order("created_at", {
-      ascending: false
-    })
-    .limit(100);
-
-  const users =
-    await getUsers(
-      (data || []).map(
-        report =>
-          report.target_user_id
-      )
-    );
-
-  const userMap =
-    new Map(
-      users.map(user => [
-        user.id,
-        user
-      ])
-    );
-
-  $("adminContent").innerHTML = `
-    <div class="admin">
-
-      <h2>通報管理</h2>
-
-      <button
-        class="secondary"
-        onclick="loadAdmin()"
-      >
-        戻る
-      </button>
-
-      <div id="adminReportList"></div>
-
-    </div>
-  `;
-
-  const box =
-    $("adminReportList");
-
-  if (!data?.length) {
-    box.innerHTML =
-      `<div class="empty">
-        未処理の通報はありません
-      </div>`;
-
-    return;
-  }
-
-  for (const report of data) {
-    const user =
-      userMap.get(
-        report.target_user_id
-      );
-
-    box.innerHTML += `
-      <div class="adminRow">
-
-        <b>
-          対象：
-          ${escapeHTML(
-            user?.username || "不明"
-          )}
-        </b>
-
-        <div>
-          ${escapeHTML(
-            report.reason || ""
-          )}
-        </div>
-
-        <div class="handle">
-          ${formatDate(
-            report.created_at
-          )}
-        </div>
-
-        <button
-          class="secondary"
-          onclick="
-            resolveReport(
-              '${report.id}'
-            )
-          "
-        >
-          対応済み
-        </button>
-
-        <button
-          class="danger"
-          onclick="
-            adminBan(
-              '${report.target_user_id}'
-            )
-          "
-        >
-          BAN
-        </button>
-
-      </div>
-    `;
-  }
-}
-
-
-async function resolveReport(reportId) {
-  await supabaseClient
-    .from("reports")
-    .update({
-      status: "resolved"
-    })
-    .eq(
-      "id",
-      reportId
-    );
-
-  await adminReports();
-}
-
-
-/* =========================================================
-   Notification actions
-   ========================================================= */
-
-function openDMFromNotification(userId) {
-  if (!userId) return;
-
-  closeModal();
-
-  openDM(userId);
-}
-
-
-async function openReplyFromNotification(postId) {
-  if (!postId) return;
-
-  const {
-    data: post
-  } = await supabaseClient
-    .from("posts")
-    .select(`
-      id,
-      user_id,
-      content,
-      image_url,
-      created_at
-    `)
-    .eq("id", postId)
-    .maybeSingle();
-
-  if (!post) {
-    toast("投稿が見つかりません");
-    return;
-  }
-
-  cache.posts.set(
-    post.id,
-    post
-  );
-
-  await replyPost(postId);
-}
-
-
-/* =========================================================
-   Refresh
-   ========================================================= */
-
-async function refreshCurrentPage() {
-  if (
-    !$("homePage")
-      .classList
-      .contains("hidden")
-  ) {
-    await loadHome();
-  }
-
-  if (
-    !$("profilePage")
-      .classList
-      .contains("hidden")
-  ) {
-    /*
-     * 現在表示中のプロフィールを
-     * 再取得する。
-     */
-    const profileId =
-      currentUser.id;
-
-    await showUserProfile(
-      profileId
-    );
-  }
-
-  if (
-    !$("bookmarksPage")
-      .classList
-      .contains("hidden")
-  ) {
-    await showBookmarks();
-  }
-}
-
-async function showFollowingLatestPosts() {
-  hidePages();
-
-  $("notificationPage").classList.remove("hidden");
-
-  const box = $("notifications");
   box.innerHTML = `<div class="empty">読み込み中...</div>`;
 
-  // 自分がフォローしているユーザー
-  const { data: follows, error: followsError } = await supabaseClient
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", currentUser.id);
-
-  if (followsError) {
-    console.error(followsError);
-    box.innerHTML = `<div class="empty">フォロー情報を取得できませんでした</div>`;
-    return;
-  }
-
-  const followingIds = (follows || [])
-    .map(row => row.following_id)
-    .filter(Boolean);
-
-  if (!followingIds.length) {
-    box.innerHTML = `<div class="empty">まだ誰もフォローしていません</div>`;
-    return;
-  }
-
-  // フォロー中ユーザーの最新10件
-  const { data: posts, error: postsError } = await supabaseClient
+  const { data: posts, error } = await supabaseClient
     .from("posts")
     .select(`
       id,
@@ -5616,18 +1207,17 @@ async function showFollowingLatestPosts() {
       image_url,
       created_at
     `)
-    .in("user_id", followingIds)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending:false })
+    .limit(50);
 
-  if (postsError) {
-    console.error(postsError);
+  if(error){
+    console.error("loadHome:", error);
     box.innerHTML = `<div class="empty">投稿を取得できませんでした</div>`;
     return;
   }
 
-  if (!posts?.length) {
-    box.innerHTML = `<div class="empty">フォローしている人の投稿はまだありません</div>`;
+  if(!posts?.length){
+    box.innerHTML = `<div class="empty">まだ投稿がありません</div>`;
     return;
   }
 
@@ -5645,10 +1235,10 @@ async function showFollowingLatestPosts() {
 
   box.innerHTML = "";
 
-  for (const post of posts) {
+  for(const post of posts){
     const user = userMap.get(post.user_id);
 
-    if (!user) continue;
+    if(!user) continue;
 
     cache.posts.set(post.id, post);
 
@@ -5657,16 +1247,490 @@ async function showFollowingLatestPosts() {
     );
   }
 }
+async function loadNotifications(){
+  const box=$("notifications");
+  box.innerHTML=`<div class="empty">読み込み中...</div>`;
+  const { data, error }=await supabaseClient.from("notifications")
+    .select(`id, user_id, actor_id, type, post_id, message_id, created_at`)
+    .eq("user_id",currentUser.id).order("created_at",{ ascending:false }).limit(50);
+  if(error){ console.error(error); box.innerHTML=`<div class="empty">取得失敗</div>`; return; }
+  if(!data?.length){ box.innerHTML=`<div class="empty">通知はありません</div>`; return; }
+  const actors=await getUsers(data.map(n=>n.actor_id));
+  const actorMap=new Map(actors.map(user=>[user.id,user]));
+  const messageIds=data.filter(n=>n.type==="message"&&n.message_id).map(n=>n.message_id);
+  let messageMap=new Map();
+  if(messageIds.length){
+    const { data: messages }=await supabaseClient.from("messages").select(`id, content`).in("id",messageIds);
+    messageMap=new Map((messages||[]).map(message=>[message.id,message]));
+  }
+  box.innerHTML="";
+  for(const n of data){
+    const actor=actorMap.get(n.actor_id);
+    if(n.type==="message"){
+      const message=messageMap.get(n.message_id);
+      const notification=document.createElement("div"); notification.className="notification";
+      notification.innerHTML=`
+        <div style="cursor:pointer" onclick="openDMFromNotification('${actor?.id||""}')">
+          <b>${escapeHTML(actor?.username||"ユーザー")}</b><span> からDMが届きました</span>
+          ${ message ? `<div style="margin-top:6px;padding:10px;background:#f5f8fa;border-radius:10px;">${escapeHTML(message.content)}</div>`:"" }
+          <div class="handle">${formatDate(n.created_at)}</div>
+        </div>
+      `;
+      box.appendChild(notification);
+      continue;
+    }
+    let text="通知";
+    if(n.type==="like") text="あなたの投稿にいいねしました";
+    if(n.type==="reply") text="あなたの投稿に返信しました";
+    if(n.type==="repost") text="あなたの投稿をリポストしました";
+    if(n.type==="follow") text="あなたをフォローしました";
+    if(n.type==="post") text="新しい投稿をしました";
+    const notification=document.createElement("div"); notification.className="notification";
+    const clickable=(n.type==="reply"||n.type==="post")&&n.post_id;
+    notification.innerHTML=`
+      <div ${clickable?`style="cursor:pointer" onclick="showPostDetail('${n.post_id}')"`:""}>
+        <b>${escapeHTML(actor?.username||"ユーザー")}</b> ${escapeHTML(text)}
+        <div class="handle">${formatDate(n.created_at)}</div>
+      </div>
+    `;
+    box.appendChild(notification);
+  }
+}
 
+function mqttTopicUser(userId){ return `chanpro-post/user/${userId}`; }
+function mqttTopicGlobal(){ return "chanpro-post/global"; }
 
-/* =========================================================
-   Start
-   ========================================================= */
+function connectMQTT(){
+  if(!currentUser) return;
+  if(mqttClient){ try{ mqttClient.end(true); }catch{} mqttClient=null; }
+  const clientId=`chanpro-post-${currentUser.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  mqttClient=mqtt.connect(MQTT_BROKER,{ clientId, clean:true, reconnectPeriod:3000, connectTimeout:10000 });
+  mqttClient.on("connect",()=>{
+    console.log("MQTT接続成功");
+    mqttClient.subscribe(mqttTopicUser(currentUser.id),{ qos:0 },(error)=>{ if(error) console.error("MQTT subscribe user:",error); });
+    mqttClient.subscribe(mqttTopicGlobal(),{ qos:0 },(error)=>{ if(error) console.error("MQTT subscribe global:",error); });
+  });
+  mqttClient.on("reconnect",()=>{ console.log("MQTT再接続中..."); });
+  mqttClient.on("error",(error)=>{ console.error("MQTT error:",error); });
+  mqttClient.on("offline",()=>{ console.log("MQTT offline"); });
+  mqttClient.on("message",async(topic,payload)=>{
+    try{
+      const event=JSON.parse(payload.toString());
+      await handleMQTTEvent(event);
+    }catch(error){ console.error("MQTT message error:",error); }
+  });
+}
+
+function mqttPublish(topic,event){
+  if(!mqttClient) return;
+  if(!mqttClient.connected){ console.log("MQTT未接続のため送信をスキップ"); return; }
+  mqttClient.publish(topic,JSON.stringify(event),{ qos:0, retain:false });
+}
+
+async function handleMQTTEvent(event){
+  if(!currentUser) return;
+  if(event.type==="message"){
+    if(!event.message_id) return;
+    if(event.sender_id===currentUser.id) return;
+    if(event.receiver_id!==currentUser.id) return;
+    if(currentDMUser && currentDMUser.id===event.sender_id && $("dmMessages")){
+      const { data: message, error }=await supabaseClient.from("messages")
+        .select(`id, sender_id, receiver_id, content, created_at`).eq("id",event.message_id).maybeSingle();
+      if(error){ console.error("DM取得:",error); return; }
+      if(!message) return;
+      const exists=document.querySelector(`[data-dm-message-id="${message.id}"]`);
+      if(exists) return;
+      appendDMMessage(message);
+      const messagesBox=$("dmMessages");
+      if(messagesBox) messagesBox.scrollTop=messagesBox.scrollHeight;
+      toast("新しいDM");
+    }
+    if(!$("messagesPage").classList.contains("hidden") && !currentDMUser){ await loadDMs(); }
+    return;
+  }
+  if(event.type==="post_created"){
+    if(!$("homePage").classList.contains("hidden")) await loadHome();
+    if(!$("detailPage").classList.contains("hidden") && currentDetailPost && currentDetailPost.id===event.post_id){
+      await renderDetailReplies(currentDetailPost.id);
+    }
+    return;
+  }
+  if(event.type==="post_deleted"){
+    cache.posts.delete(event.post_id);
+    if(!$("homePage").classList.contains("hidden")) await loadHome();
+    return;
+  }
+  if(event.type==="follow"){
+    cache.suggestedUsers=null;
+    if(!$("profilePage").classList.contains("hidden")) await showUserProfile(currentUser.id);
+    return;
+  }
+  if(event.type==="like"||event.type==="repost"){
+    if(!$("homePage").classList.contains("hidden")) await loadHome();
+    return;
+  }
+}
+
+function subscribeDMRealtime(){
+  if(dmChannel){ supabaseClient.removeChannel(dmChannel); dmChannel=null; }
+  if(!currentUser) return;
+  dmChannel=supabaseClient.channel(`dm-realtime-${currentUser.id}`)
+    .on("postgres_changes",{ event:"INSERT", schema:"public", table:"messages", filter:`receiver_id=eq.${currentUser.id}` },async(payload)=>{
+      const message=payload.new;
+      if(currentDMUser && message.sender_id===currentDMUser.id && $("dmMessages")){
+        appendDMMessage(message);
+        const messagesBox=$("dmMessages"); messagesBox.scrollTop=messagesBox.scrollHeight;
+      }
+      if(!$("messagesPage").classList.contains("hidden") && !currentDMUser) await loadDMs();
+      if(!$("notificationPage").classList.contains("hidden")) await loadNotifications();
+    })
+    .subscribe((status)=>{ console.log("DM Realtime:",status); });
+}
+
+async function loadDMs(){
+  currentDMUser=null;
+  const box=$("dmContent");
+  box.innerHTML=`<div class="empty">DM一覧を読み込み中...</div>`;
+  const { data: messages, error }=await supabaseClient.from("messages")
+    .select(`id, sender_id, receiver_id, content, created_at`)
+    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+    .order("created_at",{ ascending:false }).limit(200);
+  if(error){ console.error(error); box.innerHTML=`<div class="empty">DM一覧を取得できませんでした</div>`; return; }
+  const conversations=new Map();
+  for(const message of messages||[]){
+    const otherUserId=message.sender_id===currentUser.id?message.receiver_id:message.sender_id;
+    if(!otherUserId) continue;
+    if(!conversations.has(otherUserId)) conversations.set(otherUserId,message);
+  }
+  if(!conversations.size){ box.innerHTML=`<div class="empty">まだDMはありません</div>`; return; }
+  const users=await getUsers([...conversations.keys()]);
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  box.innerHTML="";
+  for(const [userId,message] of conversations){
+    const user=userMap.get(userId);
+    if(!user) continue;
+    const row=document.createElement("div"); row.className="userRow"; row.style.cursor="pointer";
+    row.innerHTML=`
+      <img class="avatar" src="${avatarURL(user.icon_url,50)}">
+      <div class="userRowInfo" style="flex:1">
+        <b>${escapeHTML(user.username)}</b>
+        <div class="handle" style="margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(message.content||"")}</div>
+        <div class="handle" style="margin-top:3px">${formatDate(message.created_at)}</div>
+      </div>
+    `;
+    row.onclick=()=>openDM(user.id);
+    box.appendChild(row);
+  }
+}
+
+async function openDM(userId){
+  const user=await getUser(userId);
+  if(!user){ toast("ユーザーが見つかりません"); return; }
+  currentDMUser=user;
+  hidePages();
+  $("messagesPage").classList.remove("hidden");
+  $("dmContent").innerHTML=`<div class="empty">DMを読み込み中...</div>`;
+  const { data: messages, error }=await supabaseClient.from("messages")
+    .select(`id, sender_id, receiver_id, content, created_at`)
+    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${currentUser.id}))`)
+    .order("created_at",{ ascending:true });
+  if(error){ console.error("DM取得エラー:",error); $("dmContent").innerHTML=`<div class="empty">DMを取得できませんでした</div>`; return; }
+  $("dmContent").innerHTML=`
+    <div class="pageHeader" style="display:flex;align-items:center;gap:10px;">
+      <button class="secondary" onclick="loadDMs()" style="padding:6px 10px">←</button>
+      <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;" onclick="showUserProfile('${user.id}')">
+        <img class="avatar" src="${avatarURL(user.icon_url,40)}" style="width:40px;height:40px;">
+        <div><b>${escapeHTML(user.username)}</b><div class="handle" style="font-size:12px">@${escapeHTML(user.username)}</div></div>
+      </div>
+    </div>
+    <div id="dmMessages" class="dmMessages" style="min-height:300px;max-height:60vh;overflow-y:auto;padding:15px;"></div>
+    <div style="padding:10px;display:flex;gap:8px;border-top:1px solid #e1e8ed;background:#fff;">
+      <input id="dmInput" style="flex:1;padding:11px 15px;border:1px solid #ccd6dd;border-radius:22px;outline:none;" placeholder="${escapeHTML(user.username)} にメッセージ" onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendDM(); }">
+      <button class="primary" onclick="sendDM()">送信</button>
+    </div>
+  `;
+  const messagesBox=$("dmMessages");
+  if(!messages?.length){
+    messagesBox.innerHTML=`<div class="empty" style="padding:50px 10px;text-align:center;">まだメッセージはありません<br><span style="font-size:13px;color:#657786;">最初のメッセージを送ってみましょう</span></div>`;
+  }else{
+    for(const message of messages) appendDMMessage(message);
+  }
+  messagesBox.scrollTop=messagesBox.scrollHeight;
+  setTimeout(()=>{ $("dmInput")?.focus(); },100);
+}
+
+function appendDMMessage(message){
+  const messagesBox=$("dmMessages");
+  if(!messagesBox) return;
+  if(message.id){
+    const existing=document.querySelector(`[data-dm-message-id="${message.id}"]`);
+    if(existing) return;
+  }
+  const isMine=message.sender_id===currentUser.id;
+  const div=document.createElement("div");
+  if(message.id) div.dataset.dmMessageId=message.id;
+  div.style.cssText=`margin:6px 0;padding:10px 14px;border-radius:18px;max-width:75%;width:fit-content;white-space:pre-wrap;word-break:break-word;${isMine?"margin-left:auto;background:#1d9bf0;color:white;":"margin-right:auto;background:#eff3f4;color:#0f1419;"}`;
+  div.textContent=message.content;
+  messagesBox.appendChild(div);
+}
+
+async function sendDM(){
+  if(!currentDMUser) return;
+  const input=$("dmInput");
+  const content=input.value.trim();
+  if(!content) return;
+  const { data: message, error }=await supabaseClient.from("messages")
+    .insert({ sender_id:currentUser.id, receiver_id:currentDMUser.id, content })
+    .select(`id, sender_id, receiver_id, content, created_at`).single();
+  if(error){ console.error(error); toast("DM送信失敗"); return; }
+  appendDMMessage(message);
+  mqttPublish(mqttTopicUser(currentDMUser.id),{ type:"message", message_id:message.id, sender_id:currentUser.id, receiver_id:currentDMUser.id });
+  if(currentDMUser.id!==currentUser.id){
+    await supabaseClient.from("notifications").insert({ user_id:currentDMUser.id, actor_id:currentUser.id, type:"message", message_id:message.id });
+  }
+  input.value="";
+  const messagesBox=$("dmMessages");
+  if(messagesBox) messagesBox.scrollTop=messagesBox.scrollHeight;
+}
+
+async function loadTrends(){
+  const box=$("trends");
+  if(cache.trends){ renderTrends(cache.trends); return; }
+  const { data, error }=await supabaseClient.from("post_hashtags").select("hashtag").limit(1000);
+  if(error){ console.error(error); box.innerHTML=`<div class="empty">トレンドを取得できませんでした</div>`; return; }
+  const counts=new Map();
+  for(const row of data||[]) counts.set(row.hashtag,(counts.get(row.hashtag)||0)+1);
+  const trends=[...counts.entries()].map(([tag,count])=>({ tag,count })).sort((a,b)=>b.count-a.count).slice(0,3);
+  cache.trends=trends;
+  renderTrends(trends);
+}
+
+function renderTrends(trends){
+  const box=$("trends");
+  box.innerHTML="";
+  if(!trends?.length){ box.innerHTML=`<div class="empty">まだトレンドがありません</div>`; return; }
+  for(const trend of trends){
+    const row=document.createElement("div"); row.className="trend";
+    row.innerHTML=`<b>#${escapeHTML(trend.tag)}</b><small>${trend.count}件の投稿</small>`;
+    row.onclick=()=>searchHashtag(trend.tag);
+    box.appendChild(row);
+  }
+}
+
+async function loadSuggestedUsers(){
+  const box=$("suggestedUsers");
+  const { data: users }=await supabaseClient.from("users")
+    .select(`id, username, icon_url`).neq("id",currentUser.id).limit(5);
+  if(!users?.length){ box.innerHTML=""; return; }
+  const { data: follows }=await supabaseClient.from("follows")
+    .select("following_id").eq("follower_id",currentUser.id).in("following_id",users.map(user=>user.id));
+  const followingSet=new Set((follows||[]).map(x=>x.following_id));
+  box.innerHTML="";
+  for(const user of users){
+    cache.users.set(user.id,user);
+    const isFollowing=followingSet.has(user.id);
+    const row=document.createElement("div"); row.className="userRow";
+    row.innerHTML=`
+      <img class="avatar" src="${avatarURL(user.icon_url,45)}" style="cursor:pointer">
+      <div class="userRowInfo" style="cursor:pointer;flex:1;">
+        <b>${escapeHTML(user.username)}</b><div class="handle">@${escapeHTML(user.username)}</div>
+      </div>
+      <button class="${isFollowing?"secondary":"primary"}">${isFollowing?"フォロー中":"フォロー"}</button>
+    `;
+    row.querySelector(".avatar").onclick=()=>showUserProfile(user.id);
+    row.querySelector(".userRowInfo").onclick=()=>showUserProfile(user.id);
+    row.querySelector("button").onclick=async()=>{ await toggleFollow(user.id,false); await loadSuggestedUsers(); };
+    box.appendChild(row);
+  }
+}
+
+async function reportPost(postId,userId){
+  const reason=prompt("通報理由を入力してください");
+  if(!reason) return;
+  const { error }=await supabaseClient.from("reports")
+    .insert({ reporter_id:currentUser.id, target_user_id:userId, post_id:postId, reason });
+  if(error){ console.error(error); toast("通報できませんでした"); return; }
+  toast("通報しました");
+}
+
+function checkAdmin(){
+  const isAdmin=currentUser?.role==="admin";
+  $("adminNav").classList.toggle("hidden",!isAdmin);
+}
+
+async function loadAdmin(){
+  if(currentUser?.role!=="admin"){ $("adminContent").innerHTML=`<div class="empty">管理者権限がありません</div>`; return; }
+  const [ usersResult, postsResult, reportsResult ]=await Promise.all([
+    supabaseClient.from("users").select("*",{ count:"exact", head:true }),
+    supabaseClient.from("posts").select("*",{ count:"exact", head:true }),
+    supabaseClient.from("reports").select("*",{ count:"exact", head:true }).eq("status","open")
+  ]);
+  $("adminContent").innerHTML=`
+    <div class="admin">
+      <h2>管理者ダッシュボード</h2>
+      <div class="card"><b>ユーザー</b><h2>${usersResult.count||0}</h2></div>
+      <div class="card"><b>投稿</b><h2>${postsResult.count||0}</h2></div>
+      <div class="card"><b>未処理通報</b><h2>${reportsResult.count||0}</h2></div>
+      <hr>
+      <button class="primary" onclick="adminUsers()">ユーザー管理</button>
+      <button class="secondary" onclick="adminPosts()">投稿管理</button>
+      <button class="secondary" onclick="adminReports()">通報管理</button>
+    </div>
+  `;
+}
+
+async function adminUsers(){
+  const { data }=await supabaseClient.from("users")
+    .select(`id, username, role, created_at, ban_until`)
+    .order("created_at",{ ascending:false }).limit(200);
+  $("adminContent").innerHTML=`<div class="admin"><h2>ユーザー管理</h2><button class="secondary" onclick="loadAdmin()">戻る</button><div id="adminUserList"></div></div>`;
+  const box=$("adminUserList");
+  for(const user of data||[]){
+    box.innerHTML+=`
+      <div class="adminRow">
+        <b>${escapeHTML(user.username)}</b>
+        <div class="handle">ID: ${user.id}</div>
+        <div style="margin-top:8px">
+          <button class="secondary" onclick="adminChangeRole('${user.id}')">権限変更</button>
+          <button class="danger" onclick="adminBan('${user.id}')">BAN</button>
+          <button class="danger" onclick="adminDeleteUser('${user.id}')">削除</button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function adminChangeRole(userId){
+  const role=prompt("権限を入力：admin または user");
+  if(role!=="admin" && role!=="user") return;
+  const { error }=await supabaseClient.from("users").update({ role }).eq("id",userId);
+  if(error){ toast("権限変更失敗"); return; }
+  toast("権限を変更しました");
+  await adminUsers();
+}
+
+async function adminBan(userId){
+  const minutes=Number(prompt("BAN時間（分）","60"));
+  if(!minutes||minutes<1) return;
+  const until=new Date(Date.now()+minutes*60*1000).toISOString();
+  const { error }=await supabaseClient.from("users").update({ ban_until:until }).eq("id",userId);
+  if(error){ console.error(error); toast("BAN失敗"); return; }
+  toast("BANしました");
+}
+
+async function adminDeleteUser(userId){
+  if(!confirm("このユーザーを削除しますか？")) return;
+  const { error }=await supabaseClient.from("users").delete().eq("id",userId);
+  if(error){ toast("削除失敗"); console.error(error); return; }
+  cache.users.delete(userId);
+  toast("ユーザーを削除しました");
+  await adminUsers();
+}
+
+async function adminPosts(){
+  const { data }=await supabaseClient.from("posts")
+    .select(`id, user_id, content, created_at`).order("created_at",{ ascending:false }).limit(200);
+  const users=await getUsers((data||[]).map(post=>post.user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  $("adminContent").innerHTML=`<div class="admin"><h2>投稿管理</h2><button class="secondary" onclick="loadAdmin()">戻る</button><div id="adminPostList"></div></div>`;
+  const box=$("adminPostList");
+  for(const post of data||[]){
+    const user=userMap.get(post.user_id);
+    box.innerHTML+=`
+      <div class="adminRow">
+        <b>${escapeHTML(user?.username||"")}</b>
+        <div>${escapeHTML(post.content||"")}</div>
+        <button class="danger" onclick="adminDeletePost('${post.id}')">投稿削除</button>
+      </div>
+    `;
+  }
+}
+
+async function adminDeletePost(postId){
+  if(!confirm("この投稿を削除しますか？")) return;
+  const { error }=await supabaseClient.from("posts").delete().eq("id",postId);
+  if(error){ toast("削除失敗"); return; }
+  cache.posts.delete(postId);
+  toast("削除しました");
+  await adminPosts();
+}
+
+async function adminReports(){
+  const { data }=await supabaseClient.from("reports")
+    .select(`id, target_user_id, post_id, reason, status, created_at`)
+    .eq("status","open").order("created_at",{ ascending:false }).limit(100);
+  const users=await getUsers((data||[]).map(report=>report.target_user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  $("adminContent").innerHTML=`<div class="admin"><h2>通報管理</h2><button class="secondary" onclick="loadAdmin()">戻る</button><div id="adminReportList"></div></div>`;
+  const box=$("adminReportList");
+  if(!data?.length){ box.innerHTML=`<div class="empty">未処理の通報はありません</div>`; return; }
+  for(const report of data){
+    const user=userMap.get(report.target_user_id);
+    box.innerHTML+=`
+      <div class="adminRow">
+        <b>対象：${escapeHTML(user?.username||"不明")}</b>
+        <div>${escapeHTML(report.reason||"")}</div>
+        <div class="handle">${formatDate(report.created_at)}</div>
+        <button class="secondary" onclick="resolveReport('${report.id}')">対応済み</button>
+        <button class="danger" onclick="adminBan('${report.target_user_id}')">BAN</button>
+      </div>
+    `;
+  }
+}
+
+async function resolveReport(reportId){
+  await supabaseClient.from("reports").update({ status:"resolved" }).eq("id",reportId);
+  await adminReports();
+}
+
+function openDMFromNotification(userId){
+  if(!userId) return;
+  closeModal();
+  openDM(userId);
+}
+
+async function openReplyFromNotification(postId){
+  if(!postId) return;
+  await showPostDetail(postId);
+}
+
+async function refreshCurrentPage(){
+  if(!$("homePage").classList.contains("hidden")) await loadHome();
+  if(!$("profilePage").classList.contains("hidden")) await showUserProfile(currentUser.id);
+  if(!$("bookmarksPage").classList.contains("hidden")) await showBookmarks();
+  if(!$("detailPage").classList.contains("hidden") && currentDetailPost){
+    await showPostDetail(currentDetailPost.id);
+  }
+}
+
+async function showFollowingLatestPosts(){
+  hidePages();
+  $("notificationPage").classList.remove("hidden");
+  const box=$("notifications");
+  box.innerHTML=`<div class="empty">読み込み中...</div>`;
+  const { data: follows, error: followsError }=await supabaseClient.from("follows")
+    .select("following_id").eq("follower_id",currentUser.id);
+  if(followsError){ console.error(followsError); box.innerHTML=`<div class="empty">フォロー情報を取得できませんでした</div>`; return; }
+  const followingIds=(follows||[]).map(row=>row.following_id).filter(Boolean);
+  if(!followingIds.length){ box.innerHTML=`<div class="empty">まだ誰もフォローしていません</div>`; return; }
+  const { data: posts, error: postsError }=await supabaseClient.from("posts")
+    .select(`id, user_id, content, image_url, created_at`).in("user_id",followingIds)
+    .order("created_at",{ ascending:false }).limit(10);
+  if(postsError){ console.error(postsError); box.innerHTML=`<div class="empty">投稿を取得できませんでした</div>`; return; }
+  if(!posts?.length){ box.innerHTML=`<div class="empty">フォローしている人の投稿はまだありません</div>`; return; }
+  const users=await getUsers(posts.map(post=>post.user_id));
+  const userMap=new Map(users.map(user=>[user.id,user]));
+  const meta=await getPostMeta(posts.map(post=>post.id));
+  box.innerHTML="";
+  for(const post of posts){
+    const user=userMap.get(post.user_id);
+    if(!user) continue;
+    cache.posts.set(post.id,post);
+    box.appendChild(createPostElement(post,user,meta));
+  }
+}
 
 restoreLogin();
-
 </script>
-
-
 </body>
 </html>
