@@ -232,10 +232,66 @@ const MQTT_BROKER="wss://broker.hivemq.com:8884/mqtt";
 const cache={ users:new Map(), posts:new Map(), follows:null, trends:null, suggestedUsers:null };
 
 function $(id){ return document.getElementById(id); }
+function linkifyText(text){
+  const escaped = escapeHTML(text);
+
+  return escaped.replace(
+    /https?:\/\/[^\s<]+/g,
+    url => {
+      // 末尾の句読点などをURLから外す
+      const match = url.match(/^(.+?)([.,!?、。)）\]】]+)?$/);
+      const href = match ? match[1] : url;
+      const trailing = match?.[2] || "";
+
+      return `<a
+        href="${href}"
+        target="_blank"
+        rel="noopener noreferrer"
+        style="color:#1d9bf0;text-decoration:underline;"
+      >${href}</a>${trailing}`;
+    }
+  );
+}
 function escapeHTML(value){
   return String(value??"")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+function verifiedBadge(user, size = 18){
+  if(!user?.verified) return "";
+
+  return `
+    <span
+      class="verifiedBadge"
+      title="認証済み"
+      aria-label="認証済み"
+      style="
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:${size}px;
+        height:${size}px;
+        vertical-align:-3px;
+        margin-left:3px;
+      "
+    >
+      <svg
+        viewBox="0 0 22 22"
+        width="${size}"
+        height="${size}"
+        aria-hidden="true"
+      >
+        <path
+          fill="#1d9bf0"
+          d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816z"
+        />
+        <path
+          fill="#fff"
+          d="M9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"
+        />
+      </svg>
+    </span>
+  `;
 }
 function avatarURL(url,size=100){ return url || `https://placehold.jp/${size}x${size}.png`; }
 function toast(message){
@@ -266,7 +322,7 @@ async function getUser(id,forceRefresh=false){
     if(cached) return cached;
   }
   const { data, error }=await supabaseClient.from("users")
-    .select(`id, username, icon_url, cover_url, profile, role, ban_until, program_urls, program_views, program_likes`)
+    .select(`id, username, icon_url, cover_url, profile, role, ban_until, program_urls, program_views, program_likes, verified`)
     .eq("id",id).maybeSingle();
   if(error){ console.error("getUser error:",error); return null; }
   if(!data){ console.warn("ユーザーが見つかりません:",id); return null; }
@@ -280,7 +336,7 @@ async function getUsers(ids){
   const missingIds=uniqueIds.filter(id=>!cache.users.has(id));
   if(missingIds.length){
     const { data, error }=await supabaseClient.from("users")
-      .select(`id, username, icon_url, cover_url, profile, role, ban_until`)
+      .select(`id, username, icon_url, cover_url, profile, role, ban_until, verified`)
       .in("id",missingIds);
     if(error){ console.error("getUsers:",error); }
     else{ for(const user of data||[]) cache.users.set(user.id,user); }
@@ -475,7 +531,9 @@ function createPostElement(post,user,meta){
     <div class="postHead">
       <img class="avatar" src="${avatarURL(user.icon_url,45)}" onclick="showUserProfile('${user.id}')" style="cursor:pointer">
       <div style="flex:1">
-        <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer">${escapeHTML(user.username)}</span>
+        <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer">
+          ${escapeHTML(user.username)}${verifiedBadge(user)}
+        </span>
         <span class="handle">@${escapeHTML(user.username)} · ${formatDate(post.created_at)}</span>
         <div class="postText" onclick="showPostDetail('${post.id}')">${formatContent(post.content)}</div>
         ${ post.image_url ? `<img class="postImage" src="${escapeHTML(post.image_url)}" onerror="this.style.display='none'">` : "" }
@@ -529,7 +587,9 @@ async function showPostDetail(postId){
       <div class="postHead">
         <img class="avatar" src="${avatarURL(user.icon_url,50)}" onclick="showUserProfile('${user.id}')" style="cursor:pointer">
         <div style="flex:1">
-          <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer;font-size:17px">${escapeHTML(user.username)}</span>
+            <span class="postUser" onclick="showUserProfile('${user.id}')" style="cursor:pointer;font-size:17px">
+             ${escapeHTML(user.username)}${verifiedBadge(user, 18)}
+            </span>
           <div class="handle">@${escapeHTML(user.username)}</div>
         </div>
       </div>
@@ -653,7 +713,9 @@ async function renderDetailReplies(postId){
       <div class="replyHead">
         <img class="replyAvatar" src="${avatarURL(user.icon_url,36)}" onclick="showUserProfile('${user.id}')">
         <div class="replyBody">
-          <span class="replyUser" onclick="showUserProfile('${user.id}')">${escapeHTML(user.username)}</span>
+            <span class="replyUser" onclick="showUserProfile('${user.id}')">
+             ${escapeHTML(user.username)}${verifiedBadge(user, 18)}
+            </span>
           <span class="handle">@${escapeHTML(user.username)} · ${formatDate(reply.created_at)}</span>
           <div class="replyText">${formatContent(reply.content)}</div>
           <div class="replyActions">
@@ -690,7 +752,9 @@ async function renderDetailReplies(postId){
       <div class="replyHead">
         <img class="replyAvatar" src="${avatarURL(user.icon_url,36)}" onclick="showUserProfile('${user.id}')">
         <div class="replyBody">
-          <span class="replyUser" onclick="showUserProfile('${user.id}')">${escapeHTML(user.username)}</span>
+            <span class="replyUser" onclick="showUserProfile('${user.id}')">
+             ${escapeHTML(user.username)}${verifiedBadge(user, 18)}
+            </span>
           <span class="handle">@${escapeHTML(user.username)} · ${formatDate(reply.created_at)}</span>
           <div class="replyText">${formatContent(reply.content)}</div>
           <div class="replyActions">
@@ -886,7 +950,7 @@ async function showUserProfile(userId){
               target="_blank"
               rel="noopener noreferrer"
               style="display:inline-block;padding:8px 14px;background:#333;color:#fff;text-decoration:none;border-radius:6px;text-align:center;"
-            >作品を見に行く</a>
+            >作品を見に行く(ctrl+クリック)</a>
           `).join("")}
         </div>
 
@@ -905,9 +969,11 @@ async function showUserProfile(userId){
                  <button class="secondary" onclick="openDM('${user.id}')">✉️ DM</button>
                </div>` }
         </div>
-        <h2>${escapeHTML(user.username||"ユーザー")}</h2>
+        <h2>
+          ${escapeHTML(user.username||"ユーザー")}${verifiedBadge(user, 22)}
+        </h2>
         <div class="profileHandle">@${escapeHTML(user.username||"")}</div>
-        <div class="profileBio">${escapeHTML((user.profile||"自己紹介はありません").trim())}</div>
+        <div class="profileBio">${linkifyText((user.profile||"自己紹介はありません").trim())}</div>
         ${programHTML}
         <div class="profileStats">
           <div class="profileStatClickable" onclick="showFollowList('${user.id}','following')"><b>${followingCount}</b><span>フォロー中</span></div>
@@ -964,7 +1030,10 @@ async function showFollowList(userId,type){
     row.innerHTML=`
       <img class="avatar" src="${avatarURL(targetUser.icon_url,45)}" style="cursor:pointer">
       <div class="userRowInfo" style="cursor:pointer">
-        <b>${escapeHTML(targetUser.username)}</b>
+        <b>
+          ${escapeHTML(targetUser.username)}
+          ${verifiedBadge(targetUser, 18)}
+        </b>
         <div class="handle">@${escapeHTML(targetUser.username)}</div>
       </div>
       ${ targetUser.id!==currentUser.id ? `<button class="${isFollowing?"secondary":"primary"}">${isFollowing?"フォロー中":"フォロー"}</button>`:"" }
@@ -1093,7 +1162,8 @@ async function searchAll(){
       const avatar=document.createElement("img"); avatar.className="avatar"; avatar.src=avatarURL(user.icon_url,45); avatar.style.cursor="pointer";
       avatar.onerror=()=>{ avatar.src=avatarURL("",45); };
       const info=document.createElement("div"); info.className="userRowInfo"; info.style.cssText="cursor:pointer;flex:1;";
-      const name=document.createElement("b"); name.textContent=user.username||"ユーザー";
+        const name = document.createElement("b");
+        name.innerHTML = `${escapeHTML(user.username || "ユーザー")}${verifiedBadge(user, 18)}`;
       const handle=document.createElement("div"); handle.className="handle"; handle.textContent=`@${user.username||""}`;
       info.appendChild(name); info.appendChild(handle);
       row.appendChild(avatar); row.appendChild(info);
@@ -1413,7 +1483,7 @@ async function loadDMs(){
     row.innerHTML=`
       <img class="avatar" src="${avatarURL(user.icon_url,50)}">
       <div class="userRowInfo" style="flex:1">
-        <b>${escapeHTML(user.username)}</b>
+        <b>${escapeHTML(user.username)}${verifiedBadge(user)}</b>
         <div class="handle" style="margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(message.content||"")}</div>
         <div class="handle" style="margin-top:3px">${formatDate(message.created_at)}</div>
       </div>
@@ -1440,7 +1510,7 @@ async function openDM(userId){
       <button class="secondary" onclick="loadDMs()" style="padding:6px 10px">←</button>
       <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;" onclick="showUserProfile('${user.id}')">
         <img class="avatar" src="${avatarURL(user.icon_url,40)}" style="width:40px;height:40px;">
-        <div><b>${escapeHTML(user.username)}</b><div class="handle" style="font-size:12px">@${escapeHTML(user.username)}</div></div>
+        <div><b>${escapeHTML(user.username)}${verifiedBadge(user)}</b><div class="handle" style="font-size:12px">@${escapeHTML(user.username)}</div></div>
       </div>
     </div>
     <div id="dmMessages" class="dmMessages" style="min-height:300px;max-height:60vh;overflow-y:auto;padding:15px;"></div>
@@ -1519,27 +1589,77 @@ function renderTrends(trends){
 
 async function loadSuggestedUsers(){
   const box=$("suggestedUsers");
-  const { data: users }=await supabaseClient.from("users")
-    .select(`id, username, icon_url`).neq("id",currentUser.id).limit(5);
-  if(!users?.length){ box.innerHTML=""; return; }
-  const { data: follows }=await supabaseClient.from("follows")
-    .select("following_id").eq("follower_id",currentUser.id).in("following_id",users.map(user=>user.id));
-  const followingSet=new Set((follows||[]).map(x=>x.following_id));
+
+  const { data: users, error }=await supabaseClient
+    .from("users")
+    .select(`id, username, icon_url, verified`)
+    .neq("id",currentUser.id)
+    .limit(5);
+
+  if(error){
+    console.error("おすすめユーザー取得:", error);
+    box.innerHTML=`<div class="empty">取得できませんでした</div>`;
+    return;
+  }
+
+  if(!users?.length){
+    box.innerHTML="";
+    return;
+  }
+
+  const { data: follows }=await supabaseClient
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id",currentUser.id)
+    .in("following_id",users.map(user=>user.id));
+
+  const followingSet=new Set(
+    (follows||[]).map(x=>x.following_id)
+  );
+
   box.innerHTML="";
+
   for(const user of users){
     cache.users.set(user.id,user);
+
     const isFollowing=followingSet.has(user.id);
-    const row=document.createElement("div"); row.className="userRow";
+
+    const row=document.createElement("div");
+    row.className="userRow";
+
     row.innerHTML=`
-      <img class="avatar" src="${avatarURL(user.icon_url,45)}" style="cursor:pointer">
-      <div class="userRowInfo" style="cursor:pointer;flex:1;">
-        <b>${escapeHTML(user.username)}</b><div class="handle">@${escapeHTML(user.username)}</div>
+      <img
+        class="avatar"
+        src="${avatarURL(user.icon_url,45)}"
+        style="cursor:pointer"
+      >
+
+      <div
+        class="userRowInfo"
+        style="cursor:pointer;flex:1;"
+      >
+        <b>
+          ${escapeHTML(user.username)}
+          ${verifiedBadge(user, 18)}
+        </b>
+        <div class="handle">
+          @${escapeHTML(user.username)}
+        </div>
       </div>
-      <button class="${isFollowing?"secondary":"primary"}">${isFollowing?"フォロー中":"フォロー"}</button>
+
+      <button class="${isFollowing?"secondary":"primary"}">
+        ${isFollowing?"フォロー中":"フォロー"}
+      </button>
     `;
+
     row.querySelector(".avatar").onclick=()=>showUserProfile(user.id);
     row.querySelector(".userRowInfo").onclick=()=>showUserProfile(user.id);
-    row.querySelector("button").onclick=async()=>{ await toggleFollow(user.id,false); await loadSuggestedUsers(); };
+
+    row.querySelector("button").onclick=async()=>{
+      await toggleFollow(user.id,false);
+      await loadSuggestedUsers();
+    };
+
     box.appendChild(row);
   }
 }
@@ -1581,25 +1701,64 @@ async function loadAdmin(){
 
 async function adminUsers(){
   const { data }=await supabaseClient.from("users")
-    .select(`id, username, role, created_at, ban_until`)
+    .select(`id, username, role, created_at, ban_until, verified`)
     .order("created_at",{ ascending:false }).limit(200);
   $("adminContent").innerHTML=`<div class="admin"><h2>ユーザー管理</h2><button class="secondary" onclick="loadAdmin()">戻る</button><div id="adminUserList"></div></div>`;
   const box=$("adminUserList");
   for(const user of data||[]){
     box.innerHTML+=`
       <div class="adminRow">
-        <b>${escapeHTML(user.username)}</b>
+        <b>${escapeHTML(user.username)}${verifiedBadge(user)}</b>
         <div class="handle">ID: ${user.id}</div>
         <div style="margin-top:8px">
-          <button class="secondary" onclick="adminChangeRole('${user.id}')">権限変更</button>
-          <button class="danger" onclick="adminBan('${user.id}')">BAN</button>
-          <button class="danger" onclick="adminDeleteUser('${user.id}')">削除</button>
+<button class="secondary" onclick="adminChangeRole('${user.id}')">
+  権限変更
+</button>
+
+<button
+  class="secondary"
+  onclick="adminToggleVerified('${user.id}', ${user.verified ? "true" : "false"})"
+>
+  ${user.verified ? "✓ 認証解除" : "✓ 認証する"}
+</button>
+
+<button class="danger" onclick="adminBan('${user.id}')">
+  BAN
+</button>
+
+<button class="danger" onclick="adminDeleteUser('${user.id}')">
+  削除
+</button>
         </div>
       </div>
     `;
   }
 }
+async function adminToggleVerified(userId, currentVerified){
+  if(currentUser?.role !== "admin"){
+    toast("管理者権限が必要です");
+    return;
+  }
 
+  const nextValue = !currentVerified;
+
+  const { error } = await supabaseClient
+    .from("users")
+    .update({ verified: nextValue })
+    .eq("id", userId);
+
+  if(error){
+    console.error("verified変更:", error);
+    toast("認証状態を変更できませんでした");
+    return;
+  }
+
+  cache.users.delete(userId);
+
+  toast(nextValue ? "認証マークを付けました" : "認証マークを外しました");
+
+  await adminUsers();
+}
 async function adminChangeRole(userId){
   const role=prompt("権限を入力：admin または user");
   if(role!=="admin" && role!=="user") return;
