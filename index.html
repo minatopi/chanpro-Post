@@ -650,6 +650,28 @@
             font-size: 13px;
             margin-bottom: 4px
         }
+        .navNotification {
+          position: relative;
+        }
+        
+        .notificationDot {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 15px;
+          height: 15px;
+          background: #f4212e;
+          border-radius: 50%;
+          border: 2px solid #fff;
+        }
+        button img {
+          width: 20px;
+          height: 20px;
+          object-fit: contain;
+          vertical-align: middle;
+          margin-right: 6px;
+        }
+
     </style>
 </head>
 
@@ -674,14 +696,39 @@
                 <span>chanpro-Post</span>
             </div>
             <div class=nav>
-                <button onclick='showPage("home")'>🏠 ホーム</button>
-                <button onclick='showPage("search")'>🔍 検索</button>
-                <button onclick='showPage("notifications")'>🔔 通知</button>
-                <button onclick=showFollowingLatestPosts()>👥 フォロー中</button>
-                <button onclick='showPage("messages")'>✉️ DM</button>
-                <button onclick=showMyProfile()>👤 プロフィール</button>
-                <button onclick=showBookmarks()>🔖 ブックマーク</button>
-                <button id=adminNav class=hidden onclick='showPage("admin")'>🛠 管理</button>
+                <button onclick='showPage("home")'>
+                  <img src="https://img.icons8.com/?size=96&id=TzMnSwiJW8HO&format=png" alt="ホーム"> ホーム
+                </button>
+                
+                <button onclick='showPage("search")'>
+                  <img src="https://img.icons8.com/?size=96&id=12773&format=png" alt="検索"> 検索
+                </button>
+                
+                <button id="notificationNav" class="navNotification" onclick='showPage("notifications")'>
+                  <img src="https://img.icons8.com/?size=80&id=41913&format=png" alt="通知"> 通知
+                  <span id="notificationDot" class="notificationDot hidden"></span>
+                </button>
+                
+                <button onclick='showFollowingLatestPosts()'>
+                  <img src="https://img.icons8.com/?size=160&id=fqKHVbd4GWbD&format=png" alt="フォロー中"> フォロー中
+                </button>
+                
+                <button onclick='showPage("messages")'>
+                  <img src="https://img.icons8.com/?size=160&id=bz2nLhYZWgCb&format=png" alt="DM"> DM
+                </button>
+                
+                <button onclick='showMyProfile()'>
+                  <img src="https://img.icons8.com/?size=96&id=IerOpHeUt2OH&format=png" alt="プロフィール"> プロフィール
+                </button>
+                
+                <button onclick='showBookmarks()'>
+                  <img src="https://img.icons8.com/?size=160&id=42404&format=png" alt="ブックマーク"> ブックマーク
+                </button>
+                
+                <button id="adminNav" class="hidden" onclick='showPage("admin")'>
+                  <img src="https://img.icons8.com/?size=96&id=szJmuYXfPSIN&format=png" alt="管理"> 管理
+                </button>
+
             </div>
             <button class=postButton onclick=openPostModal()>投稿</button>
             <button class=secondary style=width:100%;margin-top:10px onclick=logout()>ログアウト</button>
@@ -1023,15 +1070,24 @@ async function restoreLogin() {
         safeRemove("chanpro_post_user"));
     }
 }
-async function afterLogin() {
-  ($("loginPage").classList.add("hidden"),
-    $("app").classList.remove("hidden"),
-    connectMQTT(),
-    subscribeDMRealtime(),
-    await Promise.all([loadHome(), loadTrends(), loadSuggestedUsers()]),
-    checkAdmin(),
-    $("quickLimitedToggle").classList.toggle("hidden", !currentUser?.verified));
+async function afterLogin(){
+  $("loginPage").classList.add("hidden");
+  $("app").classList.remove("hidden");
+
+  connectMQTT();
+  subscribeDMRealtime();
+
+  await Promise.all([
+    loadHome(),
+    loadTrends(),
+    loadSuggestedUsers(),
+    updateNotificationDot()
+  ]);
+
+  checkAdmin();
+  $("quickLimitedToggle").classList.toggle("hidden",!currentUser?.verified);
 }
+
 function logout() {
   ((currentUser = null),
     cache.users.clear(),
@@ -1063,7 +1119,7 @@ async function showPage(e) {
     "search" === e && $("searchPage").classList.remove("hidden"),
     "notifications" === e &&
       ($("notificationPage").classList.remove("hidden"),
-      await loadNotifications()),
+      await loadNotifications(),await markNotificationsRead()),
     "messages" === e &&
       ($("messagesPage").classList.remove("hidden"), await loadDMs()),
     "admin" === e &&
@@ -1947,11 +2003,16 @@ async function createNotification(e) {
       .order("created_at", { ascending: !1 })
       .range(20, 100),
     r = (s || []).map((e) => e.id);
-  return (
-    r.length &&
-      (await supabaseClient.from("notifications").delete().in("id", r)),
-    t
-  );
+    if(s.length){
+      await supabaseClient.from("notifications").delete().in("id",s);
+    }
+    
+    if(e.user_id === currentUser?.id){
+      setNotificationDot(true);
+    }
+    
+    return t;
+
 }
 async function loadHome() {
   const e = $("homePosts");
@@ -2092,6 +2153,10 @@ function mqttPublish(e, t) {
 }
 async function handleMQTTEvent(e) {
   if (currentUser) {
+    if(e.type === "notification_created"){
+      setNotificationDot(true);
+      return;
+    }      
     if ("message" !== e.type)
       return "post_created" === e.type
         ? ($("homePage").classList.contains("hidden") || (await loadHome()),
@@ -2261,9 +2326,12 @@ function appendDMMessage(e) {
 }
 async function sendDM() {
   if (!currentDMUser) return;
-  const e = $("dmInput"),
-    t = e.value.trim();
+
+  const e = $("dmInput");
+  const t = e.value.trim();
+
   if (!t) return;
+
   const { data: n, error: s } = await supabaseClient
     .from("messages")
     .insert({
@@ -2273,27 +2341,54 @@ async function sendDM() {
     })
     .select("id, sender_id, receiver_id, content, created_at")
     .single();
-  if (s) return (console.error(s), void toast("DM送信失敗"));
-  (appendDMMessage(n),
-    mqttPublish(mqttTopicUser(currentDMUser.id), {
-      type: "message",
-      message_id: n.id,
-      sender_id: currentUser.id,
-      receiver_id: currentDMUser.id,
-    }),
-    currentDMUser.id !== currentUser.id &&
-      (await supabaseClient
-        .from("notifications")
-        .insert({
-          user_id: currentDMUser.id,
-          actor_id: currentUser.id,
-          type: "message",
-          message_id: n.id,
-        })),
-    (e.value = ""));
+
+  if (s) {
+    console.error(s);
+    return toast("DM送信失敗");
+  }
+
+  // DMを画面に追加
+  appendDMMessage(n);
+
+  // DM受信通知をMQTTで送信
+  mqttPublish(mqttTopicUser(currentDMUser.id), {
+    type: "message",
+    message_id: n.id,
+    sender_id: currentUser.id,
+    receiver_id: currentDMUser.id,
+  });
+
+  // 自分自身へのDMでなければ通知を作成
+  if (currentDMUser.id !== currentUser.id) {
+    const { error: notificationError } = await supabaseClient
+      .from("notifications")
+      .insert({
+        user_id: currentDMUser.id,
+        actor_id: currentUser.id,
+        type: "message",
+        message_id: n.id,
+      });
+
+    if (notificationError) {
+      console.error(notificationError);
+    } else {
+      // 通知作成をMQTTで相手に知らせる
+      mqttPublish(mqttTopicUser(currentDMUser.id), {
+        type: "notification_created",
+      });
+    }
+  }
+
+  // 入力欄をクリア
+  e.value = "";
+
+  // DM一覧を最下部へスクロール
   const r = $("dmMessages");
-  r && (r.scrollTop = r.scrollHeight);
+  if (r) {
+    r.scrollTop = r.scrollHeight;
+  }
 }
+
 async function loadTrends() {
   const e = $("trends");
   if (cache.trends) return void renderTrends(cache.trends);
@@ -2434,74 +2529,147 @@ async function adminChangeRole(e) {
     .eq("id", e);
   n ? toast("権限変更失敗") : (toast("権限を変更しました"), await adminUsers());
 }
-async function adminBan(e) {
-  if ("admin" !== currentUser?.role) return void toast("管理者権限が必要です");
-  if (!e) return void toast("ユーザーIDがありません");
-  const t = prompt("BAN時間（分）", "60");
-  if (null === t) return;
-  const n = Number(t);
-  if (!Number.isFinite(n) || n < 1)
+async function adminBan(userId) {
+  // 管理者チェック
+  if (currentUser?.role !== "admin") {
+    return void toast("管理者権限が必要です");
+  }
+
+  // ユーザーIDチェック
+  if (!userId) {
+    return void toast("ユーザーIDがありません");
+  }
+
+  // BAN時間入力
+  const input = prompt("BAN時間（分）", "60");
+
+  if (input === null) return;
+
+  const minutes = Number(input);
+
+  if (!Number.isFinite(minutes) || minutes < 1) {
     return void toast("BAN時間が正しくありません");
-  const { data: s, error: r } = await supabaseClient
+  }
+
+  // BAN対象ユーザー取得
+  const { data: user, error: userError } = await supabaseClient
     .from("users")
     .select("id, username")
-    .eq("id", e)
+    .eq("id", userId)
     .maybeSingle();
-  if (r)
-    return (
-      console.error("BAN対象ユーザー取得:", r),
-      void toast("ユーザー情報を取得できませんでした")
-    );
-  if (!s) return void toast("ユーザーが見つかりません");
-  const i = new Date(Date.now() + 60 * n * 1e3).toISOString(),
-    { error: a } = await supabaseClient
-      .from("users")
-      .update({ ban_until: i })
-      .eq("id", e);
-  if (a)
-    return (
-      console.error("アカウントBAN:", a),
-      void toast("BANに失敗しました")
-    );
-  const { data: o, error: c } = await supabaseClient
-    .from("user_devices")
-    .select("device_hash")
-    .eq("user_id", e);
-  c && console.error("ユーザー端末取得:", c);
-  const l = [...new Set((o || []).map((e) => e.device_hash).filter(Boolean))];
-  if (l.length) {
-    const e = l.map((e) => ({
-        device_hash: e,
-        reason: `ユーザー「${s.username}」のBANに伴う端末BAN`,
-        banned_by: currentUser.id,
-      })),
-      { error: t } = await supabaseClient
-        .from("banned_devices")
-        .upsert(e, { onConflict: "device_hash" });
-    if (t)
-      return (
-        console.error("端末BAN:", t),
-        toast("アカウントをBANしましたが、端末BANの登録に失敗しました"),
-        void (await adminUsers())
-      );
+
+  if (userError) {
+    console.error("BAN対象ユーザー取得:", userError);
+    return void toast("ユーザー情報を取得できませんでした");
   }
-  if ((cache.users.delete(e), e !== currentUser.id))
-    (toast(`${s.username} を ${n}分BANしました`), await adminUsers());
-  else {
-    if (((currentUser = null), safeRemove("chanpro_post_user"), mqttClient)) {
+
+  if (!user) {
+    return void toast("ユーザーが見つかりません");
+  }
+
+  // BAN終了時刻
+  const banUntil = new Date(
+    Date.now() + 60 * minutes * 1000
+  ).toISOString();
+
+  // アカウントBAN
+  const { error: banError } = await supabaseClient
+    .from("users")
+    .update({
+      ban_until: banUntil,
+    })
+    .eq("id", userId);
+
+  if (banError) {
+    console.error("アカウントBAN:", banError);
+    return void toast("BANに失敗しました");
+  }
+
+  // BAN対象ユーザーの端末情報を取得
+  const { data: devices, error: deviceError } = await supabaseClient
+    .from("user_devices")
+    .select("device_hash, device_info")
+    .eq("user_id", userId);
+
+  if (deviceError) {
+    console.error("ユーザー端末取得:", deviceError);
+  }
+
+  // device_hash単位で重複排除
+  const uniqueDevices = [
+    ...new Map(
+      (devices || [])
+        .filter((device) => device.device_hash)
+        .map((device) => [
+          device.device_hash,
+          device,
+        ])
+    ).values(),
+  ];
+
+  // 端末BAN
+  if (uniqueDevices.length) {
+    const bannedDevices = uniqueDevices.map((device) => ({
+      device_hash: device.device_hash,
+      device_info: device.device_info ?? null,
+      reason: `ユーザー「${user.username}」のBANに伴う端末BAN`,
+      banned_by: currentUser.id,
+    }));
+
+    const { error: deviceBanError } = await supabaseClient
+      .from("banned_devices")
+      .upsert(bannedDevices, {
+        onConflict: "device_hash",
+      });
+
+    if (deviceBanError) {
+      console.error("端末BAN:", deviceBanError);
+
+      toast(
+        "アカウントをBANしましたが、端末BANの登録に失敗しました"
+      );
+
+      await adminUsers();
+      return;
+    }
+  }
+
+  // キャッシュから削除
+  cache.users.delete(userId);
+
+  // 自分自身をBANした場合
+  if (userId === currentUser.id) {
+    currentUser = null;
+
+    safeRemove("chanpro_post_user");
+
+    // MQTT切断
+    if (mqttClient) {
       try {
-        mqttClient.end(!0);
+        mqttClient.end(true);
       } catch {}
+
       mqttClient = null;
     }
+
+    // DMチャンネル削除
     if (dmChannel) {
       try {
         await supabaseClient.removeChannel(dmChannel);
       } catch {}
+
       dmChannel = null;
     }
+
+    // BAN反映のためリロード
     location.reload();
+    return;
   }
+
+  // 他ユーザーをBANした場合
+  toast(`${user.username} を ${minutes}分BANしました`);
+
+  await adminUsers();
 }
 async function adminDeleteUser(e) {
   if (!confirm("このユーザーを削除しますか？")) return;
@@ -2737,6 +2905,48 @@ async function saveUserDevice(e) {
     console.error("端末情報保存失敗:", e);
   }
 }
+
+
+function setNotificationDot(show){
+  const dot = $("notificationDot");
+  if(!dot) return;
+  dot.classList.toggle("hidden", !show);
+}
+
+async function updateNotificationDot(){
+  if(!currentUser) return;
+
+  const { count, error } = await supabaseClient
+    .from("notifications")
+    .select("id", { count:"exact", head:true })
+    .eq("user_id", currentUser.id)
+    .eq("is_read", false);
+
+  if(error){
+    console.error("未読通知取得:", error);
+    return;
+  }
+
+  setNotificationDot((count || 0) > 0);
+}
+
+async function markNotificationsRead(){
+  if(!currentUser) return;
+
+  const { error } = await supabaseClient
+    .from("notifications")
+    .update({ is_read:true })
+    .eq("user_id", currentUser.id)
+    .eq("is_read", false);
+
+  if(error){
+    console.error("通知既読処理:", error);
+    return;
+  }
+
+  setNotificationDot(false);
+}
+
 restoreLogin();
 
 </script>
