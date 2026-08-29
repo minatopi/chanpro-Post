@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang=ja>
 
@@ -1255,7 +1256,9 @@ async function getPostMeta(e) {
 }
 function createPostElement(e, t, n) {
   const s = document.createElement("article");
+
   s.className = "post";
+
   const r = n.likes.get(e.id) || 0,
     i = n.replies.get(e.id) || 0,
     a = n.reposts.get(e.id) || 0,
@@ -1263,45 +1266,283 @@ function createPostElement(e, t, n) {
     c = n.myReposts.has(e.id),
     l = n.bookmarks.has(e.id),
     d = e.user_id === currentUser.id;
-  return (
-    (s.innerHTML = `\n    <div class="postHead">\n      <img class="avatar" src="${avatarURL(t.icon_url, 45)}" onclick="showUserProfile('${t.id}')" style="cursor:pointer">\n      <div style="flex:1">\n        <span class="postUser" onclick="showUserProfile('${t.id}')" style="cursor:pointer">\n          ${escapeHTML(t.username)}${verifiedBadge(t)}\n        </span>\n        <span class="handle">@${escapeHTML(t.username)} · ${formatDate(e.created_at)}</span>\n        ${e.is_limited ? '<div style="color:#1d9bf0;font-size:13px;margin-top:4px">🔒 限定投稿</div>' : ""}\n        <div class="postText" onclick="showPostDetail('${e.id}')">${formatContent(e.content)}</div>\n        ${e.image_url ? `<img class="postImage" src="${escapeHTML(e.image_url)}" onerror="this.style.display='none'">` : ""}\n        <div class="postActions">\n          <button class="action" onclick="event.stopPropagation();showPostDetail('${e.id}')">💬 ${i}</button>\n          <button class="action ${c ? "reposted" : ""}" onclick="event.stopPropagation();toggleRepost('${e.id}')">🔁 ${a}</button>\n          <button class="action ${o ? "liked" : ""}" onclick="event.stopPropagation();toggleLike('${e.id}')">❤️ ${r}</button>\n          <button class="action" onclick="event.stopPropagation();toggleBookmark('${e.id}')">${l ? "🔖" : "📑"}</button>\n          ${d ? `<button class="action" onclick="event.stopPropagation();deletePost('${e.id}')">🗑️</button>` : `<button class="action" onclick="event.stopPropagation();reportPost('${e.id}','${t.id}')">⚠️</button>`}\n        </div>\n      </div>\n    </div>\n  `),
-    s
-  );
+
+  s.innerHTML = `
+    <div class="postHead">
+
+      <img
+        class="avatar"
+        src="${avatarURL(t.icon_url, 45)}"
+        onclick="showUserProfile('${t.id}')"
+        style="cursor:pointer"
+      >
+
+      <div style="flex:1">
+
+        <span
+          class="postUser"
+          onclick="showUserProfile('${t.id}')"
+          style="cursor:pointer"
+        >${escapeHTML(t.username)}${verifiedBadge(t)}
+        </span>
+
+        <span class="handle">@${escapeHTML(t.username)} · ${formatDate(e.created_at)}
+        </span>
+
+        ${e.is_limited? '<div style="color:#1d9bf0;font-size:13px;margin-top:4px">🔒 限定投稿</div>': ""
+        }
+
+        <div class="postText"onclick="showPostDetail('${e.id}')">${formatContent(e.content)}</div>
+
+        ${
+          e.image_url
+            ? `
+              <img
+                class="postImage"
+                src="${escapeHTML(e.image_url)}"
+                onerror="this.style.display='none'"
+              >
+            `
+            : ""
+        }
+
+        <div class="postActions">
+
+          <!-- リプライ -->
+          <button
+            class="action"
+            onclick="event.stopPropagation();showPostDetail('${e.id}')"
+            aria-label="返信"
+          >
+            ${actionIcon("reply")} ${i}
+          </button>
+
+          <!-- リポスト -->
+          <button
+            class="action ${c ? "reposted" : ""}"
+            onclick="event.stopPropagation();toggleRepost('${e.id}')"
+            aria-label="リポスト"
+          >
+            ${actionIcon("repost")} ${a}
+          </button>
+
+          <!-- いいね -->
+          <button
+            class="action ${o ? "liked" : ""}"
+            onclick="event.stopPropagation();toggleLike('${e.id}')"
+            aria-label="いいね"
+          >
+            ${actionIcon("like")} ${r}
+          </button>
+
+          <!-- ブックマーク -->
+          <button
+            class="action"
+            onclick="event.stopPropagation();toggleBookmark('${e.id}')"
+            aria-label="ブックマーク"
+          >
+            ${actionIcon("bookmark")}
+          </button>
+
+          <!-- 削除 / 通報 -->
+          ${
+            d
+              ? `
+                <button class="action" onclick="event.stopPropagation();deletePost('${e.id}')" aria-label="削除"><img src="https://cdn-icons-png.magnific.com/256/16228/16228887.png" alt="削除"></button>
+
+              `
+              : `
+              <!--
+                <button
+                  class="action"
+                  onclick="event.stopPropagation();reportPost('${e.id}','${t.id}')"
+                  aria-label="通報"
+                >
+                  ⚠️
+                </button>
+                --!>
+              `
+          }
+
+        </div>
+      </div>
+    </div>
+  `;
+
+  return s;
 }
 async function showPostDetail(e) {
   if (!e) return void toast("投稿IDがありません");
-  (hidePages(), $("detailPage").classList.remove("hidden"));
+
+  hidePages();
+  $("detailPage").classList.remove("hidden");
+
   const t = $("detailContent");
   t.innerHTML = '<div class="empty">読み込み中...</div>';
+
   let n = cache.posts.get(e);
+
   if (!n) {
     const { data: s, error: r } = await supabaseClient
       .from("posts")
       .select("id, user_id, content, image_url, is_limited, created_at")
       .eq("id", e)
       .maybeSingle();
-    if (r || !s)
-      return void (t.innerHTML =
-        '<div class="empty">投稿が見つかりません</div>');
-    ((n = s), cache.posts.set(n.id, n));
+
+    if (r || !s) {
+      return void (
+        (t.innerHTML = '<div class="empty">投稿が見つかりません</div>')
+      );
+    }
+
+    n = s;
+    cache.posts.set(n.id, n);
   }
-  if (n.is_limited && !canSeeLimited())
-    return void (t.innerHTML =
-      '<div class="empty">🔒 この投稿は限定投稿です。認証済みユーザーのみ閲覧できます。</div>');
+
+  if (n.is_limited && !canSeeLimited()) {
+    return void (
+      (t.innerHTML =
+        '<div class="empty">🔒 この投稿は限定投稿です。認証済みユーザーのみ閲覧できます。</div>')
+    );
+  }
+
   currentDetailPost = n;
+
   const s = await getUser(n.user_id, !0);
-  if (!s)
-    return void (t.innerHTML =
-      '<div class="empty">ユーザー情報を取得できません</div>');
+
+  if (!s) {
+    return void (
+      (t.innerHTML =
+        '<div class="empty">ユーザー情報を取得できません</div>')
+    );
+  }
+
   const r = await getPostMeta([n.id]),
     i = r.likes.get(n.id) || 0,
     a = r.reposts.get(n.id) || 0,
     o = r.myLikes.has(n.id),
     c = r.myReposts.has(n.id),
     l = r.bookmarks.has(n.id);
-  ((t.innerHTML = `\n    <div class="detailPostWrap">\n      <div class="postHead">\n        <img class="avatar" src="${avatarURL(s.icon_url, 50)}" onclick="showUserProfile('${s.id}')" style="cursor:pointer">\n        <div style="flex:1">\n            <span class="postUser" onclick="showUserProfile('${s.id}')" style="cursor:pointer;font-size:17px">\n             ${escapeHTML(s.username)}${verifiedBadge(s, 18)}\n            </span>\n          <div class="handle">@${escapeHTML(s.username)}</div>\n        </div>\n      </div>\n      <div class="detailPostText">${formatContent(n.content)}</div>\n      ${n.image_url ? `<img class="postImage" src="${escapeHTML(n.image_url)}" onerror="this.style.display='none'">` : ""}\n      <div class="detailMeta">${formatDate(n.created_at)}</div>\n      <div class="postActions">\n        <button class="action" onclick="openDetailReplyComposer()">💬 返信する</button>\n        <button class="action ${c ? "reposted" : ""}" onclick="toggleRepost('${n.id}')">🔁 ${a}</button>\n        <button class="action ${o ? "liked" : ""}" onclick="toggleLike('${n.id}')">❤️ ${i}</button>\n        <button class="action" onclick="toggleBookmark('${n.id}')">${l ? "🔖" : "📑"}</button>\n      </div>\n    </div>\n\n    <div id="detailReplyComposer" class="detailComposer" style="display:none">\n      <div class="replyToHint" id="detailReplyHint"></div>\n      <textarea id="detailReplyText" placeholder="返信を入力"></textarea>\n      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">\n        <button class="secondary" onclick="closeDetailReplyComposer()">キャンセル</button>\n        <button class="primary" onclick="submitDetailReply()">返信</button>\n      </div>\n    </div>\n\n    <div id="detailReplies"></div>\n  `),
-    await renderDetailReplies(n.id));
+
+  t.innerHTML = `
+    <div class="detailPostWrap">
+      <div class="postHead">
+        <img
+          class="avatar"
+          src="${avatarURL(s.icon_url, 50)}"
+          onclick="showUserProfile('${s.id}')"
+          style="cursor:pointer"
+        >
+
+        <div style="flex:1">
+          <span
+            class="postUser"
+            onclick="showUserProfile('${s.id}')"
+            style="cursor:pointer;font-size:17px"
+          >${escapeHTML(s.username)}${verifiedBadge(s, 18)}
+          </span>
+
+          <div class="handle">@${escapeHTML(s.username)}</div>
+        </div>
+      </div>
+
+      <div class="detailPostText">${formatContent(n.content)}
+      </div>
+
+      ${
+        n.image_url
+          ? `<img
+              class="postImage"
+              src="${escapeHTML(n.image_url)}"
+              onerror="this.style.display='none'"
+            >`
+          : ""
+      }
+
+      <div class="detailMeta">
+        ${formatDate(n.created_at)}
+      </div>
+
+      <div class="postActions">
+        <button
+          class="action"
+          onclick="openDetailReplyComposer()"
+          aria-label="返信する"
+        >
+          ${actionIcon("reply")} 返信する
+        </button>
+
+        <button
+          class="action ${c ? "reposted" : ""}"
+          onclick="toggleRepost('${n.id}')"
+          aria-label="リポスト"
+        >
+          ${actionIcon("repost")} ${a}
+        </button>
+
+        <button
+          class="action ${o ? "liked" : ""}"
+          onclick="toggleLike('${n.id}')"
+          aria-label="いいね"
+        >
+          ${actionIcon("like")} ${i}
+        </button>
+
+        <button
+          class="action"
+          onclick="toggleBookmark('${n.id}')"
+          aria-label="ブックマーク"
+        >
+          ${actionIcon("bookmark")} ${l ? "保存済み" : ""}
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="detailReplyComposer"
+      class="detailComposer"
+      style="display:none"
+    >
+      <div
+        class="replyToHint"
+        id="detailReplyHint"
+      ></div>
+
+      <textarea
+        id="detailReplyText"
+        placeholder="返信を入力"
+      ></textarea>
+
+      <div
+        style="
+          display:flex;
+          justify-content:flex-end;
+          gap:8px;
+          margin-top:8px
+        "
+      >
+        <button
+          class="secondary"
+          onclick="closeDetailReplyComposer()"
+        >
+          キャンセル
+        </button>
+
+        <button
+          class="primary"
+          onclick="submitDetailReply()"
+        >
+          返信
+        </button>
+      </div>
+    </div>
+
+    <div id="detailReplies"></div>
+  `;
+
+  await renderDetailReplies(n.id);
 }
+
 let detailReplyParent = null;
 function openDetailReplyComposer(e = null, t = null) {
   const n = $("detailReplyComposer"),
@@ -1373,7 +1614,7 @@ async function renderDetailReplies(e) {
       r = document.createElement("div");
     ((r.className = "reply"), (r.dataset.replyId = e.id));
     const o = e.user_id === currentUser.id;
-    ((r.innerHTML = `\n      <div class="replyHead">\n        <img class="replyAvatar" src="${avatarURL(s.icon_url, 36)}" onclick="showUserProfile('${s.id}')">\n        <div class="replyBody">\n            <span class="replyUser" onclick="showUserProfile('${s.id}')">\n             ${escapeHTML(s.username)}${verifiedBadge(s, 18)}\n            </span>\n          <span class="handle">@${escapeHTML(s.username)} · ${formatDate(e.created_at)}</span>\n          <div class="replyText">${formatContent(e.content)}</div>\n          <div class="replyActions">\n            <button onclick="openDetailReplyComposer('${e.id}',${JSON.stringify(s).replace(/"/g, "&quot;")})">💬 返信</button>\n            ${o ? `<button onclick="deleteReply('${e.id}')" style="color:#f4212e">🗑️ 削除</button>` : `<button onclick="reportReply('${e.id}','${e.user_id}')">⚠️ 通報</button>`}\n          </div>\n        </div>\n      </div>\n    `),
+    ((r.innerHTML = `\n      <div class="replyHead">\n        <img class="replyAvatar" src="${avatarURL(s.icon_url, 36)}" onclick="showUserProfile('${s.id}')">\n        <div class="replyBody">\n            <span class="replyUser" onclick="showUserProfile('${s.id}')">\n             ${escapeHTML(s.username)}${verifiedBadge(s, 18)}\n            </span>\n          <span class="handle">@${escapeHTML(s.username)} · ${formatDate(e.created_at)}</span>\n          <div class="replyText">${formatContent(e.content)}</div>\n          <div class="replyActions">\n            <button onclick="openDetailReplyComposer('${e.id}',${JSON.stringify(s).replace(/"/g, "&quot;")})">💬 返信</button>\n            ${o ? `<button onclick="deleteReply('${e.id}')" style="border:none;background:none;padding:0;cursor:pointer;"><img src="https://cdn-icons-png.magnific.com/256/16228/16228887.png" alt="削除" style="width:20px;height:20px;"></button>` : `<!--<button onclick="reportReply('${e.id}','${e.user_id}')">⚠️ 通報</button>--!>`}\n          </div>\n        </div>\n      </div>\n    `),
       t.appendChild(r));
     const c = a.get(e.id) || [];
     if (c.length) {
@@ -1390,7 +1631,7 @@ async function renderDetailReplies(e) {
       o = document.createElement("div");
     ((o.className = "reply"),
       (o.dataset.replyId = t.id),
-      (o.innerHTML = `\n      <div class="replyHead">\n        <img class="replyAvatar" src="${avatarURL(i.icon_url, 36)}" onclick="showUserProfile('${i.id}')">\n        <div class="replyBody">\n            <span class="replyUser" onclick="showUserProfile('${i.id}')">\n             ${escapeHTML(i.username)}${verifiedBadge(i, 18)}\n            </span>\n          <span class="handle">@${escapeHTML(i.username)} · ${formatDate(t.created_at)}</span>\n          <div class="replyText">${formatContent(t.content)}</div>\n          <div class="replyActions">\n            <button onclick="openDetailReplyComposer('${t.id}',${JSON.stringify(i).replace(/"/g, "&quot;")})">💬 返信</button>\n            ${a ? `<button onclick="deleteReply('${t.id}')" style="color:#f4212e">🗑️ 削除</button>` : `<button onclick="reportReply('${t.id}','${t.user_id}')">⚠️ 通報</button>`}\n          </div>\n        </div>\n      </div>\n    `),
+      (o.innerHTML = `\n      <div class="replyHead">\n        <img class="replyAvatar" src="${avatarURL(i.icon_url, 36)}" onclick="showUserProfile('${i.id}')">\n        <div class="replyBody">\n            <span class="replyUser" onclick="showUserProfile('${i.id}')">\n             ${escapeHTML(i.username)}${verifiedBadge(i, 18)}\n            </span>\n          <span class="handle">@${escapeHTML(i.username)} · ${formatDate(t.created_at)}</span>\n          <div class="replyText">${formatContent(t.content)}</div>\n          <div class="replyActions">\n            <button onclick="openDetailReplyComposer('${t.id}',${JSON.stringify(i).replace(/"/g, "&quot;")})">💬 返信</button>\n            ${a ? `<button onclick="deleteReply('${e.id}')" style="border:none;background:none;padding:0;cursor:pointer;"><img src="https://cdn-icons-png.magnific.com/256/16228/16228887.png" alt="削除" style="width:20px;height:20px;"></button>` :`<!--<button onclick="reportReply('${t.id}','${t.user_id}')">⚠️ 通報</button>--!>`}\n          </div>\n        </div>\n      </div>\n    `),
       e.appendChild(o));
     const c = s.get(t.id) || [];
     if (c.length) {
@@ -1543,99 +1784,612 @@ async function showMyProfile() {
   await showUserProfile(currentUser.id);
 }
 async function showUserProfile(e) {
-  if (e) {
-    (console.log("showUserProfile:", e),
-      hidePages(),
-      $("profilePage").classList.remove("hidden"),
-      ($("profilePage").innerHTML = '<div class="empty">読み込み中...</div>'));
-    try {
-      const t = await getUser(e, !0);
-      if (!t)
-        return void ($("profilePage").innerHTML =
-          '<div class="empty">ユーザーが見つかりません</div>');
-      let postsCountQ = supabaseClient
-        .from("posts")
+  if (!e) {
+    return toast("ユーザーIDがありません");
+  }
+
+  console.log("showUserProfile:", e);
+
+  hidePages();
+  $("profilePage").classList.remove("hidden");
+  $("profilePage").innerHTML = '<div class="empty">読み込み中...</div>';
+
+  try {
+    // ========================================
+    // ユーザー情報
+    // ========================================
+    const t = await getUser(e, !0);
+
+    if (!t) {
+      $("profilePage").innerHTML =
+        '<div class="empty">ユーザーが見つかりません</div>';
+      return;
+    }
+
+    // ========================================
+    // フォロワー・フォロー中・投稿数
+    // ========================================
+    let postsCountQ = supabaseClient
+      .from("posts")
+      .select("*", { count: "exact", head: !0 })
+      .eq("user_id", e);
+
+    if (!canSeeLimited()) {
+      postsCountQ = postsCountQ.or(
+        "is_limited.is.null,is_limited.eq.false",
+      );
+    }
+
+    const [n, s, r] = await Promise.all([
+      // フォロワー
+      supabaseClient
+        .from("follows")
         .select("*", { count: "exact", head: !0 })
-        .eq("user_id", e);
-      canSeeLimited() ||
-        (postsCountQ = postsCountQ.or(
-          "is_limited.is.null,is_limited.eq.false",
-        ));
-      const [n, s, r] = await Promise.all([
-        supabaseClient
-          .from("follows")
-          .select("*", { count: "exact", head: !0 })
-          .eq("following_id", e),
-        supabaseClient
-          .from("follows")
-          .select("*", { count: "exact", head: !0 })
-          .eq("follower_id", e),
-        postsCountQ,
-      ]);
-      (n.error && console.error("followers取得エラー:", n.error),
-        s.error && console.error("following取得エラー:", s.error),
-        r.error && console.error("posts count取得エラー:", r.error));
-      let i = !1;
-      if (e !== currentUser.id) {
-        const { data: t, error: n } = await supabaseClient
+        .eq("following_id", e),
+
+      // フォロー中
+      supabaseClient
+        .from("follows")
+        .select("*", { count: "exact", head: !0 })
+        .eq("follower_id", e),
+
+      // 本人の投稿数
+      postsCountQ,
+    ]);
+
+    if (n.error) console.error("followers取得エラー:", n.error);
+    if (s.error) console.error("following取得エラー:", s.error);
+    if (r.error) console.error("posts count取得エラー:", r.error);
+
+    // ========================================
+    // フォロー状態
+    // ========================================
+    let i = false;
+
+    if (e !== currentUser.id) {
+      const { data: followData, error: followError } =
+        await supabaseClient
           .from("follows")
           .select("id")
           .eq("follower_id", currentUser.id)
           .eq("following_id", e)
           .maybeSingle();
-        (n && console.error("follow状態取得エラー:", n), (i = !!t));
+
+      if (followError) {
+        console.error("follow状態取得エラー:", followError);
       }
-      const a = n.count || 0,
-        o = s.count || 0,
-        c = r.count || 0,
-        l = Array.isArray(t.program_urls) ? t.program_urls.filter(Boolean) : [],
-        d = Array.isArray(t.program_views)
-          ? t.program_views.reduce((e, t) => e + (Number(t) || 0), 0)
-          : 0,
-        u = Array.isArray(t.program_likes)
-          ? t.program_likes.reduce((e, t) => e + (Number(t) || 0), 0)
-          : 0,
-        p =
-          Array.isArray(t.program_views) &&
-          t.program_views.some((e) => null != e),
-        m =
-          Array.isArray(t.program_likes) &&
-          t.program_likes.some((e) => null != e);
-      let f = "";
-      if (
-        (l.length &&
-          (f = `\n        <div class="programStats" style="margin-top:15px;">\n          <h3 style="margin-bottom:10px;">ちゃんプロで公開した作品の総閲覧、いいね数</h3>\n          ${p || m ? `\n            <div style="display:flex;gap:30px;margin:20px 0;align-items:center;">\n              ${p ? `<div style="text-align:center;"><div style="font-size:28px;font-weight:700;">👀 ${d.toLocaleString("ja-JP")}</div><div style="font-size:14px;color:#657786;margin-top:3px;">閲覧</div></div>` : ""}\n              ${m ? `<div style="text-align:center;"><div style="font-size:28px;font-weight:700;">❤️ ${u.toLocaleString("ja-JP")}</div><div style="font-size:14px;color:#657786;margin-top:3px;">いいね</div></div>` : ""}\n            </div>` : ""}\n        <div style="display:flex;flex-direction:column;gap:8px;">\n          ${l.map((e) => `\n            <a\n              href="${escapeHTML(e)}"\n              target="_blank"\n              rel="noopener noreferrer"\n              style="display:inline-block;padding:8px 14px;background:#333;color:#fff;text-decoration:none;border-radius:6px;text-align:center;"\n            >作品を見に行く(ctrl+クリック)</a>\n          `).join("")}\n        </div>\n\n        </div>\n      `),
-        ($("profilePage").innerHTML =
-          `\n      <div class="profileCover" style="background-image:url('${escapeHTML(t.cover_url || "")}');"></div>\n      <div class="profileInfo">\n        <img class="profileBigAvatar" src="${escapeHTML(avatarURL(t.icon_url, 100))}" onerror="this.src='${escapeHTML(avatarURL("", 100))}'">\n        <div class="profileActions">\n          ${e === currentUser.id ? '<button class="secondary" onclick="openProfileEdit()">プロフィール編集</button>' : `<div style="display:flex;gap:8px;flex-wrap:wrap;">\n                 <button class="${i ? "secondary" : "primary"}" onclick="toggleFollow('${t.id}')">${i ? "フォロー中" : "フォロー"}</button>\n                 <button class="secondary" onclick="openDM('${t.id}')">✉️ DM</button>\n               </div>`}\n        </div>\n        <h2>\n          ${escapeHTML(t.username || "ユーザー")}${verifiedBadge(t, 22)}\n        </h2>\n        <div class="profileHandle">@${escapeHTML(t.username || "")}</div>\n        <div class="profileBio">${linkifyText((t.profile || "自己紹介はありません").trim())}</div>\n        ${f}\n        <div class="profileStats">\n          <div class="profileStatClickable" onclick="showFollowList('${t.id}','following')"><b>${o}</b><span>フォロー中</span></div>\n          <div class="profileStatClickable" onclick="showFollowList('${t.id}','followers')"><b>${a}</b><span>フォロワー</span></div>\n          <div><b>${c}</b><span>投稿</span></div>\n        </div>\n      </div>\n    `))
-      );
-      const { data: g, error: v } = await supabaseClient
-          .from("posts")
-          .select("id, user_id, content, image_url, is_limited, created_at")
-          .eq("user_id", e)
-          .order("created_at", { ascending: !1 })
-          .limit(50),
-        h = document.createElement("div");
-      if (((h.id = "profilePosts"), $("profilePage").appendChild(h), v))
-        return (
-          console.error("プロフィール投稿取得エラー:", v),
-          void (h.innerHTML =
-            '<div class="empty">投稿を取得できませんでした</div>')
-        );
-      const gposts = canSeeLimited()
-        ? g || []
-        : (g || []).filter((e) => e.is_limited !== true);
-      if (!gposts.length)
-        return void (h.innerHTML =
-          '<div class="empty">まだ投稿がありません</div>');
-      const w = await getPostMeta(gposts.map((e) => e.id));
-      for (const e of gposts)
-        (cache.posts.set(e.id, e), h.appendChild(createPostElement(e, t, w)));
-    } catch (e) {
-      (console.error("showUserProfile unexpected error:", e),
-        ($("profilePage").innerHTML =
-          '<div class="empty">プロフィールの読み込みに失敗しました</div>'));
+
+      i = !!followData;
     }
-  } else toast("ユーザーIDがありません");
+
+    // ========================================
+    // プロフィール情報
+    // ========================================
+    const a = n.count || 0;
+    const o = s.count || 0;
+    const c = r.count || 0;
+
+    const l = Array.isArray(t.program_urls)
+      ? t.program_urls.filter(Boolean)
+      : [];
+
+    const d = Array.isArray(t.program_views)
+      ? t.program_views.reduce(
+          (e, t) => e + (Number(t) || 0),
+          0,
+        )
+      : 0;
+
+    const u = Array.isArray(t.program_likes)
+      ? t.program_likes.reduce(
+          (e, t) => e + (Number(t) || 0),
+          0,
+        )
+      : 0;
+
+    const p =
+      Array.isArray(t.program_views) &&
+      t.program_views.some((e) => null != e);
+
+    const m =
+      Array.isArray(t.program_likes) &&
+      t.program_likes.some((e) => null != e);
+
+    // ========================================
+    // 作品情報
+    // ========================================
+    let f = "";
+
+    if (l.length) {
+      f = `
+        <div class="programStats" style="margin-top:15px;">
+
+          <h3 style="margin-bottom:10px;">
+            ちゃんプロで公開した作品の総閲覧、いいね数
+          </h3>
+
+          ${
+            p || m
+              ? `
+            <div
+              style="
+                display:flex;
+                gap:30px;
+                margin:20px 0;
+                align-items:center;
+              "
+            >
+
+              ${
+                p
+                  ? `
+                <div style="text-align:center;">
+                  <div style="font-size:28px;font-weight:700;">
+                    👀 ${d.toLocaleString("ja-JP")}
+                  </div>
+                  <div
+                    style="
+                      font-size:14px;
+                      color:#657786;
+                      margin-top:3px;
+                    "
+                  >
+                    閲覧
+                  </div>
+                </div>
+              `
+                  : ""
+              }
+
+              ${
+                m
+                  ? `
+                <div style="text-align:center;">
+                  <div style="font-size:28px;font-weight:700;">
+                    ❤️ ${u.toLocaleString("ja-JP")}
+                  </div>
+                  <div
+                    style="
+                      font-size:14px;
+                      color:#657786;
+                      margin-top:3px;
+                    "
+                  >
+                    いいね
+                  </div>
+                </div>
+              `
+                  : ""
+              }
+
+            </div>
+          `
+              : ""
+          }
+
+          <div
+            style="
+              display:flex;
+              flex-direction:column;
+              gap:8px;
+            "
+          >
+            ${l
+              .map(
+                (e) => `
+              <a
+                href="${escapeHTML(e)}"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="
+                  display:inline-block;
+                  padding:8px 14px;
+                  background:#333;
+                  color:#fff;
+                  text-decoration:none;
+                  border-radius:6px;
+                  text-align:center;
+                "
+              >
+                作品を見に行く(ctrl+クリック)
+              </a>
+            `,
+              )
+              .join("")}
+          </div>
+
+        </div>
+      `;
+    }
+
+    // ========================================
+    // プロフィール表示
+    // ========================================
+    $("profilePage").innerHTML = `
+      <div
+        class="profileCover"
+        style="
+          background-image:url('${escapeHTML(t.cover_url || "")}');
+        "
+      ></div>
+
+      <div class="profileInfo">
+
+        <img
+          class="profileBigAvatar"
+          src="${escapeHTML(avatarURL(t.icon_url, 100))}"
+          onerror="this.src='${escapeHTML(avatarURL("", 100))}'"
+        >
+
+        <div class="profileActions">
+
+          ${
+            e === currentUser.id
+              ? `
+                <button
+                  class="secondary"
+                  onclick="openProfileEdit()"
+                >
+                  プロフィール編集
+                </button>
+              `
+              : `
+                <div
+                  style="
+                    display:flex;
+                    gap:8px;
+                    flex-wrap:wrap;
+                  "
+                >
+
+                  <button
+                    class="${i ? "secondary" : "primary"}"
+                    onclick="toggleFollow('${t.id}')"
+                  >
+                    ${i ? "フォロー中" : "フォロー"}
+                  </button>
+
+                  <button
+                    class="secondary"
+                    onclick="openDM('${t.id}')"
+                  >
+                    ✉️ DM
+                  </button>
+
+                </div>
+              `
+          }
+
+        </div>
+
+        <h2>
+          ${escapeHTML(t.username || "ユーザー")}
+          ${verifiedBadge(t, 22)}
+        </h2>
+
+        <div class="profileHandle">
+          @${escapeHTML(t.username || "")}
+        </div>
+
+        <div class="profileBio">${linkifyText((t.profile || "自己紹介はありません").trim(),)}
+        </div>
+
+        ${f}
+
+        <div class="profileStats">
+
+          <div
+            class="profileStatClickable"
+            onclick="showFollowList('${t.id}','following')"
+          >
+            <b>${o}</b>
+            <span>フォロー中</span>
+          </div>
+
+          <div
+            class="profileStatClickable"
+            onclick="showFollowList('${t.id}','followers')"
+          >
+            <b>${a}</b>
+            <span>フォロワー</span>
+          </div>
+
+          <div>
+            <b>${c}</b>
+            <span>投稿</span>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+    // ========================================
+    // 投稿一覧
+    //
+    // 本人の投稿
+    // ＋
+    // 本人がリポストした投稿
+    //
+    // を混ぜる
+    // ========================================
+
+    // ----------------------------
+    // 本人の通常投稿
+    // ----------------------------
+    const { data: ownPosts, error: ownPostsError } =
+      await supabaseClient
+        .from("posts")
+        .select(
+          "id, user_id, content, image_url, is_limited, created_at",
+        )
+        .eq("user_id", e)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+    if (ownPostsError) {
+      console.error(
+        "プロフィール投稿取得エラー:",
+        ownPostsError,
+      );
+
+      const h = document.createElement("div");
+      h.id = "profilePosts";
+
+      $("profilePage").appendChild(h);
+
+      h.innerHTML =
+        '<div class="empty">投稿を取得できませんでした</div>';
+
+      return;
+    }
+
+    // ----------------------------
+    // 本人がリポストしたもの
+    // ----------------------------
+    const { data: repostRows, error: repostError } =
+      await supabaseClient
+        .from("reposts")
+        .select("post_id, user_id, created_at")
+        .eq("user_id", e)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+    if (repostError) {
+      console.error(
+        "プロフィールリポスト取得エラー:",
+        repostError,
+      );
+    }
+
+    // リポストされた元投稿ID
+    const repostPostIds = [
+      ...new Set(
+        (repostRows || [])
+          .map((r) => r.post_id)
+          .filter(Boolean),
+      ),
+    ];
+
+    // ----------------------------
+    // 元投稿をまとめて取得
+    // ----------------------------
+    let repostPosts = [];
+
+    if (repostPostIds.length) {
+      const { data: rp, error: rpError } =
+        await supabaseClient
+          .from("posts")
+          .select(
+            "id, user_id, content, image_url, is_limited, created_at",
+          )
+          .in("id", repostPostIds);
+
+      if (rpError) {
+        console.error(
+          "リポスト元投稿取得エラー:",
+          rpError,
+        );
+      } else {
+        repostPosts = rp || [];
+      }
+    }
+
+    // ----------------------------
+    // 限定投稿を除外
+    // ----------------------------
+    const visibleOwnPosts = canSeeLimited()
+      ? ownPosts || []
+      : (ownPosts || []).filter(
+          (post) => post.is_limited !== true,
+        );
+
+    const visibleRepostPosts = canSeeLimited()
+      ? repostPosts
+      : repostPosts.filter(
+          (post) => post.is_limited !== true,
+        );
+
+    // ----------------------------
+    // 投稿ID → 投稿データ
+    // ----------------------------
+    const repostPostMap = new Map();
+
+    for (const post of visibleRepostPosts) {
+      repostPostMap.set(post.id, post);
+    }
+
+    // ========================================
+    // 表示用データを作る
+    //
+    // type:
+    //   post   = 本人の投稿
+    //   repost = 本人がリポスト
+    // ========================================
+    const profileItems = [];
+
+    // 通常投稿
+    for (const post of visibleOwnPosts) {
+      profileItems.push({
+        type: "post",
+        post: post,
+        sortDate: new Date(post.created_at).getTime(),
+      });
+    }
+
+    // リポスト
+    for (const repost of repostRows || []) {
+      const post = repostPostMap.get(repost.post_id);
+
+      // 元投稿が存在しない・非表示ならスキップ
+      if (!post) continue;
+
+      profileItems.push({
+        type: "repost",
+        post: post,
+
+        // ★リポストした時間で並べる
+        sortDate: new Date(
+          repost.created_at,
+        ).getTime(),
+
+        repostedAt: repost.created_at,
+        repostUserId: e,
+      });
+    }
+
+    // ========================================
+    // 新しい順に並べる
+    // ========================================
+    profileItems.sort(
+      (a, b) => b.sortDate - a.sortDate,
+    );
+
+    // ========================================
+    // 投稿コンテナ
+    // ========================================
+    const h = document.createElement("div");
+    h.id = "profilePosts";
+
+    $("profilePage").appendChild(h);
+
+    if (!profileItems.length) {
+      h.innerHTML =
+        '<div class="empty">まだ投稿がありません</div>';
+      return;
+    }
+
+    // ========================================
+    // 投稿メタ情報
+    // ========================================
+    const allPostIds = [
+      ...new Set(
+        profileItems
+          .map((item) => item.post.id)
+          .filter(Boolean),
+      ),
+    ];
+
+    const w = await getPostMeta(allPostIds);
+
+    // ========================================
+    // 元投稿者を取得
+    // ========================================
+    const authorIds = [
+      ...new Set(
+        profileItems
+          .map((item) => item.post.user_id)
+          .filter(Boolean),
+      ),
+    ];
+
+    const authors = await getUsers(authorIds);
+
+    const authorMap = new Map();
+
+    for (const author of authors) {
+      authorMap.set(author.id, author);
+    }
+
+    // ========================================
+    // 表示
+    // ========================================
+    for (const item of profileItems) {
+      const post = item.post;
+
+      cache.posts.set(post.id, post);
+
+      // --------------------------------------
+      // 通常投稿
+      // --------------------------------------
+      if (item.type === "post") {
+        const author = authorMap.get(post.user_id) || t;
+
+        h.appendChild(
+          createPostElement(
+            post,
+            author,
+            w,
+          ),
+        );
+
+        continue;
+      }
+
+      // --------------------------------------
+      // リポスト
+      // --------------------------------------
+      if (item.type === "repost") {
+        const repostHeader =
+          document.createElement("div");
+
+        repostHeader.style.cssText = `
+          padding:10px 16px 4px 16px;
+          font-size:14px;
+          color:#657786;
+        `;
+
+        repostHeader.innerHTML = `
+          <span
+            style="
+              color:#00ba7c;
+              font-weight:600;
+            "
+          >
+            🔁
+          </span>
+
+          <span>
+            ${escapeHTML(t.username || "ユーザー")}
+          </span>
+
+          さんがリポストしました
+        `;
+
+        h.appendChild(repostHeader);
+
+        // 元投稿者
+        const author =
+          authorMap.get(post.user_id) || t;
+
+        h.appendChild(
+          createPostElement(
+            post,
+            author,
+            w,
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    console.error(
+      "showUserProfile unexpected error:",
+      e,
+    );
+
+    $("profilePage").innerHTML =
+      '<div class="empty">プロフィールの読み込みに失敗しました</div>';
+  }
 }
 async function showFollowList(e, t) {
   const n = await getUser(e);
@@ -2945,6 +3699,38 @@ async function markNotificationsRead(){
   }
 
   setNotificationDot(false);
+}
+function actionIcon(type, size = 18) {
+  const paths = {
+    reply: `
+      <path fill="currentColor"
+        d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/>
+    `,
+    repost: `
+      <path fill="currentColor"
+        d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"/>
+    `,
+    like: `
+      <path fill="currentColor"
+        d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.41-4.86-.514-6.67.887-1.79 2.647-2.91 4.601-3.01 1.651-.09 3.368.56 4.798 2.01 1.429-1.45 3.146-2.1 4.796-2.01 1.954.1 3.714 1.22 4.601 3.01.896 1.81.846 4.17-.514 6.67z"/>
+    `,
+    bookmark: `
+      <path fill="currentColor"
+        d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5zM6.5 4c-.276 0-.5.22-.5.5v14.56l6-4.29 6 4.29V4.5c0-.28-.224-.5-.5-.5h-11z"/>
+    `
+  };
+
+  return `
+    <svg
+      viewBox="0 0 24 24"
+      width="${size}"
+      height="${size}"
+      aria-hidden="true"
+      style="display:inline-block;vertical-align:-4px;"
+    >
+      ${paths[type] || ""}
+    </svg>
+  `;
 }
 
 restoreLogin();
