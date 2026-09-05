@@ -1898,109 +1898,144 @@ async function showUserProfile(e) {
     // ========================================
     // 作品情報
     // ========================================
-    let f = "";
+// ========================================
+// 作品情報
+// ========================================
+// ========================================
+// 作品情報
+// ========================================
+// ========================================
+// 作品情報
+// ========================================
+// ========================================
+// 作品情報
+// ========================================
+let f = "";
 
-    if (l.length) {
-      f = `
-        <div class="programStats" style="margin-top:15px;">
+if (l.length) {
+  // 閲覧・いいね情報があるか
+  const hasStats = p || m;
 
-          <h3 style="margin-bottom:10px;">
-            ちゃんプロで公開した作品の総閲覧、いいね数
-          </h3>
+  f = `
+    <div class="programStats" style="margin-top:15px;">
+
+      ${
+        hasStats
+          ? `
+        <!-- 閲覧・いいね情報がある場合 -->
+        <h3 style="margin-bottom:10px; display:flex; align-items:center; gap:12px;">
+          ちゃんプロで公開した作品の総閲覧、いいね数
+          <a
+            href="https://minatopi.github.io/chanpro/Scraping.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="font-size:12px; padding:3px 8px; border-radius:4px;"
+          >
+            スクレイピングに関する概要
+          </a>
+        </h3>
+
+        <div
+          style="
+            display:flex;
+            gap:30px;
+            margin:20px 0;
+            align-items:center;
+          "
+        >
 
           ${
-            p || m
+            p
               ? `
-            <div
-              style="
-                display:flex;
-                gap:30px;
-                margin:20px 0;
-                align-items:center;
-              "
-            >
-
-              ${
-                p
-                  ? `
-                <div style="text-align:center;">
-                  <div style="font-size:28px;font-weight:700;">
-                    👀 ${d.toLocaleString("ja-JP")}
-                  </div>
-                  <div
-                    style="
-                      font-size:14px;
-                      color:#657786;
-                      margin-top:3px;
-                    "
-                  >
-                    閲覧
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-
-              ${
-                m
-                  ? `
-                <div style="text-align:center;">
-                  <div style="font-size:28px;font-weight:700;">
-                    ❤️ ${u.toLocaleString("ja-JP")}
-                  </div>
-                  <div
-                    style="
-                      font-size:14px;
-                      color:#657786;
-                      margin-top:3px;
-                    "
-                  >
-                    いいね
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-
+            <div style="text-align:center;">
+              <div style="font-size:28px;font-weight:700;">
+                👀 ${d.toLocaleString("ja-JP")}
+              </div>
+              <div style="font-size:14px;color:#657786;margin-top:3px;">
+                閲覧
+              </div>
             </div>
           `
               : ""
           }
 
-          <div
-            style="
-              display:flex;
-              flex-direction:column;
-              gap:8px;
-            "
-          >
-            ${l
-              .map(
-                (e) => `
-              <a
-                href="${escapeHTML(e)}"
-                target="_blank"
-                rel="noopener noreferrer"
-                style="
-                  display:inline-block;
-                  padding:8px 14px;
-                  background:#333;
-                  color:#fff;
-                  text-decoration:none;
-                  border-radius:6px;
-                  text-align:center;
-                "
-              >
-                作品を見に行く(ctrl+クリック)
-              </a>
-            `,
-              )
-              .join("")}
-          </div>
+          ${
+            m
+              ? `
+            <div style="text-align:center;">
+              <div style="font-size:28px;font-weight:700;">
+                ❤️ ${u.toLocaleString("ja-JP")}
+              </div>
+              <div style="font-size:14px;color:#657786;margin-top:3px;">
+                いいね
+              </div>
+            </div>
+          `
+              : ""
+          }
 
         </div>
-      `;
-    }
+      `
+          : `
+        <!-- プロフィールURLだけある場合 -->
+        <div
+          style="
+            margin:20px 0;
+            padding:12px 15px;
+            background:#f5f5f5;
+            border-radius:6px;
+            color:#657786;
+            font-size:14px;
+          "
+        >
+          定期実行のためすぐに更新することができません。
+          <a
+            href="https://minatopi.github.io/chanpro/Scraping.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="margin-left:8px;"
+          >
+            スクレイピングに関する概要
+          </a>
+        </div>
+      `
+      }
+
+      <!-- 作品リンク -->
+      <div
+        style="
+          display:flex;
+          flex-direction:column;
+          gap:8px;
+        "
+      >
+        ${l
+          .map(
+            (e) => `
+          <a
+            href="${escapeHTML(e)}"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="
+              display:inline-block;
+              padding:8px 14px;
+              background:#333;
+              color:#fff;
+              text-decoration:none;
+              border-radius:6px;
+              text-align:center;
+            "
+          >
+            作品を見に行く(ctrl+クリック)
+          </a>
+        `,
+          )
+          .join("")}
+      </div>
+
+    </div>
+  `;
+}
 
     // ========================================
     // プロフィール表示
@@ -2839,11 +2874,23 @@ async function loadNotifications() {
       continue;
     }
     let s = "通知";
+    
     ("like" === n.type && (s = "あなたの投稿にいいねしました"),
       "reply" === n.type && (s = "あなたの投稿に返信しました"),
       "repost" === n.type && (s = "あなたの投稿をリポストしました"),
       "follow" === n.type && (s = "あなたをフォローしました"),
-      "post" === n.type && (s = "新しい投稿をしました"));
+      "post" === n.type && (s = "新しい投稿をしました"),
+      n.type && n.type.startsWith("program_like|") && (() => {
+        const parts = n.type.split("|");
+    
+        const count = parseInt(parts[2], 10);
+    
+        if (!isNaN(count)) {
+          s = `あなたのプロジェクトにいいねが ${count}件増えました`;
+        } else {
+          s = "あなたのプロジェクトにいいねが増えました";
+        }
+      })());
     const i = document.createElement("div");
     i.className = "notification";
     const o = ("reply" === n.type || "post" === n.type) && n.post_id;
