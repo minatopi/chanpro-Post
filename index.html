@@ -672,7 +672,218 @@
           vertical-align: middle;
           margin-right: 6px;
         }
+/* ============================================================
+   プロフィール音楽
+   ============================================================ */
 
+.profileMusicSection {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e1e8ed;
+  border-radius: 16px;
+  background: #f8fafb;
+}
+
+.profileMusicHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.profileMusicTitle {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.profileMusicSub {
+  color: #536471;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.profileMusicEmpty {
+  padding: 14px;
+  text-align: center;
+  color: #536471;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px dashed #cfd9de;
+}
+
+.profileMusicCard {
+  background: #fff;
+  border: 1px solid #e1e8ed;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.profileMusicInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.profileMusicIcon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#1d9bf0,#7856ff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+}
+
+.profileMusicName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileMusicSize {
+  color: #536471;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.profileMusicControls {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profileMusicPlayButton {
+  flex: 1;
+  border: 0;
+  background: #1d9bf0;
+  color: #fff;
+  border-radius: 22px;
+  padding: 9px 14px;
+  font-weight: 700;
+}
+
+.profileMusicPlayButton:hover {
+  background: #1688d8;
+}
+
+.profileMusicStopButton {
+  border: 1px solid #cfd9de;
+  background: #fff;
+  color: #0f1419;
+  border-radius: 22px;
+  padding: 9px 14px;
+  font-weight: 700;
+}
+
+.profileMusicDrop {
+  margin-top: 10px;
+  border: 2px dashed #cfd9de;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  background: #fff;
+  transition: .15s;
+}
+
+.profileMusicDrop:hover {
+  border-color: #1d9bf0;
+  background: #f7fbff;
+}
+
+.profileMusicDrop.dragover {
+  border-color: #1d9bf0;
+  background: #eef7fd;
+}
+
+.profileMusicDrop strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.profileMusicDrop small {
+  color: #536471;
+}
+
+.profileMusicProgressWrap {
+  margin-top: 12px;
+  display: none;
+}
+
+.profileMusicProgressWrap.show {
+  display: block;
+}
+
+.profileMusicProgress {
+  width: 100%;
+  height: 8px;
+  background: #e1e8ed;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.profileMusicProgressBar {
+  width: 0%;
+  height: 100%;
+  background: #1d9bf0;
+  transition: width .15s;
+}
+
+.profileMusicProgressText {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #536471;
+  text-align: center;
+}
+
+.profileMusicFileInput {
+  display: none;
+}
+
+.profileMusicDanger {
+  border: 1px solid #f4212e;
+  background: #fff;
+  color: #f4212e;
+  border-radius: 22px;
+  padding: 8px 13px;
+  font-weight: 700;
+}
+
+.profileMusicDanger:hover {
+  background: #fff1f2;
+}
+
+.profileMusicModalInfo {
+  padding: 10px 12px;
+  background: #f7f9fa;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #536471;
+}
+
+.profileMusicCurrent {
+  margin-bottom: 12px;
+}
+
+.profileMusicCurrentLabel {
+  font-size: 12px;
+  color: #536471;
+  margin-bottom: 5px;
+}
+
+.profileMusicUploadLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 12px;
+}
     </style>
 </head>
 
@@ -798,6 +1009,26 @@
     </div>
     <div id=toast class="toast hidden"></div>
 <script>
+// ============================================================
+// プロフィール音楽設定
+// ============================================================
+
+const PROFILE_MUSIC_MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const PROFILE_MUSIC_CHUNK_SIZE = 32 * 1024;     // 32KB
+const PROFILE_MUSIC_MAX_CHUNKS =
+  Math.ceil(PROFILE_MUSIC_MAX_SIZE / PROFILE_MUSIC_CHUNK_SIZE);
+
+const PROFILE_MUSIC_ALLOWED_TYPES = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave"
+];
+
+let profileMusicAudio = null;
+let profileMusicObjectUrl = null;
+let profileMusicSubscriptions = new Map();
 const SUPABASE_URL = "https://ldnmqfmebvyzlmhgnljf.supabase.co",
   SUPABASE_ANON_KEY = "sb_publishable_sJCCy8PpxucgNgweKh9jsA_BKne3v3U",
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -921,9 +1152,20 @@ async function getUser(e, t = !1) {
   }
   const { data: n, error: s } = await supabaseClient
     .from("users")
-    .select(
-      "id, username, icon_url, cover_url, profile, role, ban_until, program_urls, program_views, program_likes, verified",
-    )
+    .select(`
+      id,
+      username,
+      icon_url,
+      cover_url,
+      profile,
+      role,
+      ban_until,
+      program_urls,
+      program_views,
+      program_likes,
+      verified,
+      profile_music
+    `)
     .eq("id", e)
     .maybeSingle();
   return s
@@ -1799,11 +2041,25 @@ async function showUserProfile(e) {
     // ユーザー情報
     // ========================================
     const t = await getUser(e, !0);
-
+    
     if (!t) {
       $("profilePage").innerHTML =
         '<div class="empty">ユーザーが見つかりません</div>';
       return;
+    }
+    
+    // ========================================
+    // プロフィール音楽を登録
+    // ========================================
+    window.__profileMusicMap =
+      window.__profileMusicMap || {};
+    
+    if (
+      t.profile_music &&
+      t.profile_music.music_id
+    ) {
+      window.__profileMusicMap[t.id] =
+        t.profile_music;
     }
 
     // ========================================
@@ -2047,17 +2303,17 @@ if (l.length) {
           background-image:url('${escapeHTML(t.cover_url || "")}');
         "
       ></div>
-
+    
       <div class="profileInfo">
-
+    
         <img
           class="profileBigAvatar"
           src="${escapeHTML(avatarURL(t.icon_url, 100))}"
           onerror="this.src='${escapeHTML(avatarURL("", 100))}'"
         >
-
+    
         <div class="profileActions">
-
+    
           ${
             e === currentUser.id
               ? `
@@ -2076,43 +2332,46 @@ if (l.length) {
                     flex-wrap:wrap;
                   "
                 >
-
+    
                   <button
                     class="${i ? "secondary" : "primary"}"
                     onclick="toggleFollow('${t.id}')"
                   >
                     ${i ? "フォロー中" : "フォロー"}
                   </button>
-
+    
                   <button
                     class="secondary"
                     onclick="openDM('${t.id}')"
                   >
                     ✉️ DM
                   </button>
-
+    
                 </div>
               `
           }
-
+    
         </div>
-
+    
         <h2>
           ${escapeHTML(t.username || "ユーザー")}
           ${verifiedBadge(t, 22)}
         </h2>
-
+    
         <div class="profileHandle">
           @${escapeHTML(t.username || "")}
         </div>
-
-        <div class="profileBio">${linkifyText((t.profile || "自己紹介はありません").trim(),)}
+    
+        <div class="profileBio">${linkifyText((t.profile || "自己紹介はありません").trim(),
+          )}
         </div>
-
+    
+        ${renderProfileMusic(t)}
+    
         ${f}
-
+    
         <div class="profileStats">
-
+    
           <div
             class="profileStatClickable"
             onclick="showFollowList('${t.id}','following')"
@@ -2120,7 +2379,7 @@ if (l.length) {
             <b>${o}</b>
             <span>フォロー中</span>
           </div>
-
+    
           <div
             class="profileStatClickable"
             onclick="showFollowList('${t.id}','followers')"
@@ -2128,16 +2387,17 @@ if (l.length) {
             <b>${a}</b>
             <span>フォロワー</span>
           </div>
-
+    
           <div>
             <b>${c}</b>
             <span>投稿</span>
           </div>
-
+    
         </div>
-
+    
       </div>
     `;
+
 
     // ========================================
     // 投稿一覧
@@ -2426,6 +2686,70 @@ if (l.length) {
       '<div class="empty">プロフィールの読み込みに失敗しました</div>';
   }
 }
+function renderProfileMusic(user) {
+  const music =
+    user?.profile_music || null;
+
+  if (!music || !music.music_id) {
+    return "";
+  }
+
+  const musicName = String(music.name || "")
+    .replace(/\.[^/.]+$/, "");
+
+  return `
+    <div class="profileMusicCard">
+
+      <div class="profileMusicInfo">
+
+        <div class="profileMusicIcon">
+          🎵
+        </div>
+
+        <div style="min-width:0;flex:1">
+
+          <div class="profileMusicName">
+            ${escapeHtml(musicName)}
+          </div>
+
+          <div class="profileMusicSize">
+            ${formatProfileMusicSize(music.size)}
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="profileMusicControls">
+
+        <button
+          type="button"
+          class="profileMusicPlayButton"
+          onclick="playProfileMusic(
+            '${String(user.id).replace(/'/g, "\\'")}',
+            window.__profileMusicMap[
+              '${String(user.id).replace(/'/g, "\\'")}'
+            ]
+          )"
+        >
+          ▶ 再生
+        </button>
+
+        <button
+          type="button"
+          class="profileMusicStopButton"
+          onclick="stopProfileMusic()"
+        >
+          ⏹ 停止
+        </button>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
 async function showFollowList(e, t) {
   const n = await getUser(e);
   if (!n) return;
@@ -2507,11 +2831,255 @@ async function toggleFollow(e, t = !0) {
     t && (await showUserProfile(e)));
 }
 function openProfileEdit() {
-  const e =
-    (Array.isArray(currentUser.program_urls) && currentUser.program_urls[0]) ||
-    "";
-  openModal(
-    `\n    <h2>プロフィール編集</h2>\n    <b>ユーザー変更</b>\n    <input id="editUsername" value="${escapeHTML(currentUser.username)}" placeholder="ユーザー名">\n    <b>アイコン画像URL</b>\n    <input id="editIcon" value="${escapeHTML(currentUser.icon_url || "")}" placeholder="アイコン画像URL">\n    <b>プロフィール背景画像URL</b>\n    <input id="editCover" value="${escapeHTML(currentUser.cover_url || "")}" placeholder="プロフィール背景画像URL">\n    <b>自己紹介</b>\n    <textarea id="editBio" placeholder="自己紹介" style="height:120px">${escapeHTML(currentUser.profile || "")}</textarea>\n    <div style="margin-top:15px">\n      <b>プログラムURL</b>\n      <div class="handle" style="margin:6px 0">chanpro.jpのプログラムプロフィールURLを1つ設定できます</div>\n      <input id="editProgramUrl" value="${escapeHTML(e)}" placeholder="https://chanpro.jp/00-program-profile/...">\n    </div>\n    <div style="text-align:right;margin-top:10px">\n      <button class="secondary" onclick="closeModal()">キャンセル</button>\n      <button class="primary" onclick="saveProfileEdit()">保存</button>\n    </div>\n  `,
+  if (!currentUser) {
+    showToast("ログインしてください");
+    return;
+  }
+
+  const music =
+    currentUser.profile_music || null;
+
+  const musicHtml = music
+    ? `
+      <div class="profileMusicCurrent">
+        <div class="profileMusicCurrentLabel">
+          現在設定中の音楽
+        </div>
+
+        <div class="profileMusicCard">
+
+          <div class="profileMusicInfo">
+            <div class="profileMusicIcon">
+              🎵
+            </div>
+
+            <div style="min-width:0;flex:1">
+              <div class="profileMusicName">
+                ${escapeHtml(music.name)}
+              </div>
+
+              <div class="profileMusicSize">
+                ${formatProfileMusicSize(music.size)}
+              </div>
+            </div>
+          </div>
+
+          <div class="profileMusicControls">
+
+            <button
+              type="button"
+              class="profileMusicPlayButton"
+              onclick="playProfileMusic(
+                currentUser.id,
+                currentUser.profile_music
+              )"
+            >
+              ▶ 再生
+            </button>
+
+            <button
+              type="button"
+              class="profileMusicStopButton"
+              onclick="stopProfileMusic()"
+            >
+              ⏹ 停止
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="profileMusicDanger"
+            style="width:100%;margin-top:10px"
+            onclick="deleteProfileMusic()"
+          >
+            🗑 音楽を削除
+          </button>
+
+        </div>
+      </div>
+    `
+    : `
+      <div class="profileMusicEmpty">
+        まだプロフィール音楽が設定されていません
+      </div>
+    `;
+
+  modalContent.innerHTML = `
+
+    <h2 style="margin-top:0">
+      プロフィールを編集
+    </h2>
+
+    <label>
+      ユーザー名
+    </label>
+
+    <input
+      id="editUsername"
+      value="${escapeHtml(currentUser.username || "")}"
+    >
+
+    <label>
+      アイコンURL
+    </label>
+
+    <input
+      id="editIcon"
+      value="${escapeHtml(currentUser.icon_url || "")}"
+    >
+
+    <label>
+      カバー画像URL
+    </label>
+
+    <input
+      id="editCover"
+      value="${escapeHtml(currentUser.cover_url || "")}"
+    >
+
+    <label>
+      自己紹介
+    </label>
+
+    <textarea
+      id="editBio"
+      rows="5"
+    >${escapeHtml(currentUser.profile || "")}</textarea>
+
+    <label>
+      プログラムURL
+    </label>
+
+    <input
+      id="editProgramUrl"
+      value="${
+        escapeHtml(
+          Array.isArray(currentUser.program_urls)
+            ? (currentUser.program_urls[0] || "")
+            : ""
+        )
+      }">
+
+    <div class="profileMusicSection">
+
+      <div class="profileMusicHeader">
+
+        <div>
+          <div class="profileMusicTitle">
+            🎵 プロフィール音楽
+          </div>
+
+          <div class="profileMusicSub">
+            プロフィールで再生できる音楽を設定
+          </div>
+        </div>
+
+      </div>
+
+      ${musicHtml}
+
+      <label
+        class="profileMusicDrop"
+        id="profileMusicDrop"
+        for="profileMusicFileInput"
+      >
+
+        <strong>
+          🎵 音楽を追加
+        </strong>
+
+        <small>
+          MP3 / WAV ・ 最大2MB
+        </small>
+
+        <input
+          id="profileMusicFileInput"
+          class="profileMusicFileInput"
+          type="file"
+          accept=".mp3,.wav,audio/mpeg,audio/wav"
+        >
+
+      </label>
+
+      <div
+        id="profileMusicProgressWrap"
+        class="profileMusicProgressWrap"
+      >
+
+        <div class="profileMusicProgress">
+          <div
+            id="profileMusicProgressBar"
+            class="profileMusicProgressBar"
+          ></div>
+        </div>
+
+        <div
+          id="profileMusicProgressText"
+          class="profileMusicProgressText"
+        ></div>
+
+      </div>
+
+      <div class="profileMusicModalInfo">
+        音楽データ本体はMQTTに保存され、
+        プロフィールには音楽情報だけが保存されます。
+        1曲につき最大2MBです。
+      </div>
+
+    </div>
+
+    <div
+      style="
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        margin-top:18px
+      "
+    >
+
+      <button
+        class="secondary"
+        onclick="closeModal()"
+      >
+        キャンセル
+      </button>
+
+      <button
+        class="primary"
+        onclick="saveProfileEdit()"
+      >
+        保存
+      </button>
+
+    </div>
+  `;
+
+  document
+    .getElementById(
+      "profileMusicFileInput"
+    )
+    .addEventListener(
+      "change",
+      async event => {
+
+        const file =
+          event.target.files[0];
+
+        if (!file) {
+          return;
+        }
+
+        await handleProfileMusicSelect(
+          file
+        );
+      }
+    );
+
+  setupProfileMusicDropZone();
+
+  modal.classList.remove(
+    "hidden"
   );
 }
 function validProgramUrl(e) {
@@ -2537,45 +3105,107 @@ function validHttpUrl(e) {
   }
 }
 async function saveProfileEdit() {
-  const e = $("editUsername").value.trim(),
-    t = $("editIcon").value.trim(),
-    n = $("editCover").value.trim(),
-    s = $("editBio").value.trim(),
-    r = $("editProgramUrl").value.trim();
-  if (!e) return void toast("ユーザー名を入力してください");
-  if (!validHttpUrl(t)) return void toast("アイコン画像URLが正しくありません");
-  if (!validHttpUrl(n)) return void toast("背景URLが正しくありません");
-  if (r && !validProgramUrl(r))
-    return void toast(
-      "chanpro.jpのプログラムプロフィールURLを入力してください",
+  if (!currentUser) {
+    showToast("ログインしてください");
+    return;
+  }
+
+  const username =
+    document
+      .getElementById("editUsername")
+      ?.value
+      .trim() || "";
+
+  const icon =
+    document
+      .getElementById("editIcon")
+      ?.value
+      .trim() || "";
+
+  const cover =
+    document
+      .getElementById("editCover")
+      ?.value
+      .trim() || "";
+
+  const bio =
+    document
+      .getElementById("editBio")
+      ?.value || "";
+
+  const programUrl =
+    document
+      .getElementById("editProgramUrl")
+      ?.value
+      .trim() || "";
+
+  if (!username) {
+    showToast(
+      "ユーザー名を入力してください"
     );
-  const i = r ? [r] : [],
-    { data: a, error: o } = await supabaseClient
-      .from("users")
-      .update({
-        username: e,
-        icon_url: t,
-        cover_url: n,
-        profile: s,
-        program_urls: i,
-      })
-      .eq("id", currentUser.id)
-      .select(
-        "id, username, icon_url, cover_url, profile, program_urls, role, ban_until",
-      )
-      .single();
-  if (o)
-    return (
-      console.error("saveProfileEdit:", o),
-      void ("23505" === o.code
-        ? toast("そのユーザー名は使用されています")
-        : toast("プロフィールを保存できませんでした"))
+    return;
+  }
+
+  try {
+
+    const programUrls =
+      programUrl
+        ? [programUrl]
+        : [];
+
+    const updateData = {
+      username: username,
+      icon_url: icon,
+      cover_url: cover,
+      profile: bio,
+      program_urls: programUrls
+    };
+
+    const { error } =
+      await supabaseClient
+        .from("users")
+        .update(updateData)
+        .eq("id", currentUser.id);
+
+    if (error) {
+      throw error;
+    }
+
+    // 現在ユーザーにも反映
+    currentUser.username =
+      username;
+
+    currentUser.icon_url =
+      icon;
+
+    currentUser.cover_url =
+      cover;
+
+    currentUser.profile =
+      bio;
+
+    currentUser.program_urls =
+      programUrls;
+
+    closeModal();
+
+    showToast(
+      "プロフィールを保存しました"
     );
-  ((currentUser = a),
-    cache.users.set(a.id, a),
-    closeModal(),
-    await showMyProfile(),
-    toast("プロフィールを保存しました"));
+
+    await showMyProfile();
+
+  } catch (error) {
+
+    console.error(
+      "プロフィール保存エラー:",
+      error
+    );
+
+    showToast(
+      "プロフィールの保存に失敗しました"
+    );
+  }
 }
 async function searchAll() {
   const e = $("searchInput").value.trim();
@@ -3778,6 +4408,991 @@ function actionIcon(type, size = 18) {
       ${paths[type] || ""}
     </svg>
   `;
+}
+async function mqttPublishRaw(topic, payload, retain = true) {
+  if (!mqttClient) {
+    throw new Error("MQTT接続がありません");
+  }
+
+  if (!mqttClient.connected) {
+    throw new Error("MQTTに接続されていません");
+  }
+
+  return new Promise((resolve, reject) => {
+    mqttClient.publish(
+      topic,
+      payload,
+      {
+        qos: 1,
+        retain: retain
+      },
+      (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      }
+    );
+  });
+}
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+
+  let binary = "";
+
+  const sliceSize = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += sliceSize) {
+    const slice = bytes.subarray(
+      i,
+      Math.min(i + sliceSize, bytes.length)
+    );
+
+    binary += String.fromCharCode(...slice);
+  }
+
+  return btoa(binary);
+}
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return buffer;
+}
+function formatProfileMusicSize(size) {
+  if (!Number.isFinite(size)) {
+    return "0 B";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(2)} MB`;
+}
+function createProfileMusicId() {
+  const random =
+    Math.random().toString(36).slice(2, 10);
+
+  return `${Date.now()}-${random}`;
+}
+function getProfileMusicTopic(userId, musicId, type, index = null) {
+  const base =
+    `chanpro-post/music/${userId}/${musicId}`;
+
+  if (type === "meta") {
+    return `${base}/meta`;
+  }
+
+  if (type === "chunk") {
+    return `${base}/chunk/${index}`;
+  }
+
+  throw new Error("不正な音楽トピックタイプです");
+}
+async function clearProfileMusicRetain(userId, music) {
+  if (!music || !music.music_id) {
+    return;
+  }
+
+  const musicId = music.music_id;
+
+  // メタ情報削除
+  const metaTopic =
+    getProfileMusicTopic(userId, musicId, "meta");
+
+  await mqttPublishRaw(
+    metaTopic,
+    "",
+    true
+  );
+
+  // チャンク削除
+  const totalChunks =
+    Number(music.chunks || 0);
+
+  for (let i = 0; i < totalChunks; i++) {
+    const topic =
+      getProfileMusicTopic(
+        userId,
+        musicId,
+        "chunk",
+        i
+      );
+
+    await mqttPublishRaw(
+      topic,
+      "",
+      true
+    );
+  }
+}
+async function uploadProfileMusic(file) {
+  if (!currentUser) {
+    throw new Error("ログインしてください");
+  }
+
+  if (!(file instanceof File)) {
+    throw new Error("音楽ファイルを選択してください");
+  }
+
+  // ----------------------------------------------------------
+  // ファイル形式チェック
+  // ----------------------------------------------------------
+
+  const extension =
+    file.name.split(".").pop().toLowerCase();
+
+  const allowedExtensions = [
+    "mp3",
+    "wav"
+  ];
+
+  if (!allowedExtensions.includes(extension)) {
+    throw new Error(
+      "対応形式はMP3またはWAVです"
+    );
+  }
+
+  if (
+    file.type &&
+    !PROFILE_MUSIC_ALLOWED_TYPES.includes(file.type)
+  ) {
+    if (extension !== "mp3" && extension !== "wav") {
+      throw new Error(
+        "MP3またはWAVファイルを選択してください"
+      );
+    }
+  }
+
+  // ----------------------------------------------------------
+  // サイズチェック
+  // ----------------------------------------------------------
+
+  if (file.size <= 0) {
+    throw new Error("空の音楽ファイルです");
+  }
+
+  if (file.size > PROFILE_MUSIC_MAX_SIZE) {
+    throw new Error(
+      `音楽ファイルは最大${formatProfileMusicSize(PROFILE_MUSIC_MAX_SIZE)}です`
+    );
+  }
+
+  // ----------------------------------------------------------
+  // 現在の音楽
+  // ----------------------------------------------------------
+
+  const oldMusic =
+    currentUser.profile_music || null;
+
+  const musicId =
+    createProfileMusicId();
+
+  const buffer =
+    await file.arrayBuffer();
+
+  const bytes =
+    new Uint8Array(buffer);
+
+  const totalChunks =
+    Math.ceil(
+      bytes.length /
+      PROFILE_MUSIC_CHUNK_SIZE
+    );
+
+  if (totalChunks > PROFILE_MUSIC_MAX_CHUNKS) {
+    throw new Error(
+      "音楽ファイルの分割数が上限を超えています"
+    );
+  }
+
+  // ----------------------------------------------------------
+  // アップロード表示
+  // ----------------------------------------------------------
+
+  setProfileMusicUploadProgress(
+    0,
+    "音楽ファイルを準備しています..."
+  );
+
+  try {
+
+    // --------------------------------------------------------
+    // 新しい音楽を先にMQTTへ保存
+    // --------------------------------------------------------
+
+    for (
+      let index = 0;
+      index < totalChunks;
+      index++
+    ) {
+      const start =
+        index * PROFILE_MUSIC_CHUNK_SIZE;
+
+      const end =
+        Math.min(
+          start + PROFILE_MUSIC_CHUNK_SIZE,
+          bytes.length
+        );
+
+      const chunk =
+        bytes.slice(start, end);
+
+      const base64 =
+        arrayBufferToBase64(chunk.buffer);
+
+      const payload =
+        JSON.stringify({
+          type: "profile_music_chunk",
+          music_id: musicId,
+          index: index,
+          total: totalChunks,
+          data: base64
+        });
+
+      const topic =
+        getProfileMusicTopic(
+          currentUser.id,
+          musicId,
+          "chunk",
+          index
+        );
+
+      await mqttPublishRaw(
+        topic,
+        payload,
+        true
+      );
+
+      const percent =
+        Math.round(
+          ((index + 1) / totalChunks) * 90
+        );
+
+      setProfileMusicUploadProgress(
+        percent,
+        `音楽データを保存中... ${index + 1}/${totalChunks}`
+      );
+    }
+
+    // --------------------------------------------------------
+    // メタ情報
+    // --------------------------------------------------------
+
+    const musicMetadata = {
+      music_id: musicId,
+      name: file.name,
+      mime:
+        file.type ||
+        (
+          extension === "mp3"
+            ? "audio/mpeg"
+            : "audio/wav"
+        ),
+      size: file.size,
+      chunks: totalChunks,
+      created_at:
+        new Date().toISOString()
+    };
+
+    const metaTopic =
+      getProfileMusicTopic(
+        currentUser.id,
+        musicId,
+        "meta"
+      );
+
+    await mqttPublishRaw(
+      metaTopic,
+      JSON.stringify({
+        type: "profile_music_meta",
+        ...musicMetadata
+      }),
+      true
+    );
+
+    setProfileMusicUploadProgress(
+      95,
+      "プロフィールを更新しています..."
+    );
+
+    // --------------------------------------------------------
+    // Supabase
+    // --------------------------------------------------------
+
+    const { error } =
+      await supabaseClient
+        .from("users")
+        .update({
+          profile_music: musicMetadata
+        })
+        .eq("id", currentUser.id);
+
+    if (error) {
+      // Supabase更新失敗時は新しく保存したMQTTを削除
+      try {
+        await clearProfileMusicRetain(
+          currentUser.id,
+          musicMetadata
+        );
+      } catch (cleanupError) {
+        console.error(
+          "MQTT cleanup error:",
+          cleanupError
+        );
+      }
+
+      throw error;
+    }
+
+    // --------------------------------------------------------
+    // 古い音楽を削除
+    // --------------------------------------------------------
+
+    if (
+      oldMusic &&
+      oldMusic.music_id &&
+      oldMusic.music_id !== musicId
+    ) {
+      try {
+        await clearProfileMusicRetain(
+          currentUser.id,
+          oldMusic
+        );
+      } catch (cleanupError) {
+        console.error(
+          "古い音楽の削除に失敗:",
+          cleanupError
+        );
+      }
+    }
+
+    // --------------------------------------------------------
+    // 現在ユーザー更新
+    // --------------------------------------------------------
+
+    currentUser.profile_music =
+      musicMetadata;
+
+    setProfileMusicUploadProgress(
+      100,
+      "アップロード完了"
+    );
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 500)
+    );
+
+    return musicMetadata;
+
+  } finally {
+    hideProfileMusicUploadProgress();
+  }
+}
+function setProfileMusicUploadProgress(percent, text) {
+  const wrap =
+    document.getElementById(
+      "profileMusicProgressWrap"
+    );
+
+  const bar =
+    document.getElementById(
+      "profileMusicProgressBar"
+    );
+
+  const label =
+    document.getElementById(
+      "profileMusicProgressText"
+    );
+
+  if (!wrap || !bar || !label) {
+    return;
+  }
+
+  wrap.classList.add("show");
+
+  bar.style.width =
+    `${Math.max(0, Math.min(100, percent))}%`;
+
+  label.textContent =
+    text || `${percent}%`;
+}
+function hideProfileMusicUploadProgress() {
+  const wrap =
+    document.getElementById(
+      "profileMusicProgressWrap"
+    );
+
+  const bar =
+    document.getElementById(
+      "profileMusicProgressBar"
+    );
+
+  const label =
+    document.getElementById(
+      "profileMusicProgressText"
+    );
+
+  if (!wrap) {
+    return;
+  }
+
+  setTimeout(() => {
+    wrap.classList.remove("show");
+
+    if (bar) {
+      bar.style.width = "0%";
+    }
+
+    if (label) {
+      label.textContent = "";
+    }
+  }, 700);
+}
+async function getProfileMusic(userId, music) {
+  if (
+    !userId ||
+    !music ||
+    !music.music_id
+  ) {
+    throw new Error("音楽情報がありません");
+  }
+
+  const musicId =
+    music.music_id;
+
+  const totalChunks =
+    Number(music.chunks);
+
+  if (
+    !Number.isInteger(totalChunks) ||
+    totalChunks <= 0
+  ) {
+    throw new Error(
+      "音楽チャンク情報が不正です"
+    );
+  }
+
+  if (
+    totalChunks > PROFILE_MUSIC_MAX_CHUNKS
+  ) {
+    throw new Error(
+      "音楽チャンク数が上限を超えています"
+    );
+  }
+
+  const chunks =
+    new Array(totalChunks);
+
+  const topics = [];
+
+  for (
+    let index = 0;
+    index < totalChunks;
+    index++
+  ) {
+    topics.push({
+      index,
+      topic:
+        getProfileMusicTopic(
+          userId,
+          musicId,
+          "chunk",
+          index
+        )
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+
+    const timeout =
+      setTimeout(() => {
+        cleanup();
+
+        reject(
+          new Error(
+            "音楽データの取得がタイムアウトしました"
+          )
+        );
+      }, 30000);
+
+    const handlers = [];
+
+    function cleanup() {
+      clearTimeout(timeout);
+
+      for (const handler of handlers) {
+        mqttClient.removeListener(
+          "message",
+          handler
+        );
+      }
+
+      for (const item of topics) {
+        mqttClient.unsubscribe(
+          item.topic,
+          () => {}
+        );
+      }
+    }
+
+    let received = 0;
+
+    for (const item of topics) {
+
+      mqttClient.subscribe(
+        item.topic,
+        {
+          qos: 1
+        },
+        (error) => {
+          if (error) {
+            cleanup();
+            reject(error);
+          }
+        }
+      );
+    }
+
+    const messageHandler =
+      (topic, payload) => {
+
+        const target =
+          topics.find(
+            item => item.topic === topic
+          );
+
+        if (!target) {
+          return;
+        }
+
+        try {
+
+          const data =
+            JSON.parse(
+              payload.toString()
+            );
+
+          if (
+            data.type !==
+            "profile_music_chunk"
+          ) {
+            return;
+          }
+
+          if (
+            data.music_id !== musicId
+          ) {
+            return;
+          }
+
+          if (
+            data.index !== target.index
+          ) {
+            return;
+          }
+
+          if (
+            chunks[target.index]
+          ) {
+            return;
+          }
+
+          chunks[target.index] =
+            data.data;
+
+          received++;
+
+          if (
+            received >= totalChunks
+          ) {
+            cleanup();
+
+            const buffers =
+              chunks.map(
+                chunk =>
+                  base64ToArrayBuffer(chunk)
+              );
+
+            const totalLength =
+              buffers.reduce(
+                (sum, buffer) =>
+                  sum + buffer.byteLength,
+                0
+              );
+
+            const result =
+              new Uint8Array(
+                totalLength
+              );
+
+            let offset = 0;
+
+            for (const buffer of buffers) {
+              result.set(
+                new Uint8Array(buffer),
+                offset
+              );
+
+              offset +=
+                buffer.byteLength;
+            }
+
+            resolve(
+              result.buffer
+            );
+          }
+
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      };
+
+    handlers.push(messageHandler);
+
+    mqttClient.on(
+      "message",
+      messageHandler
+    );
+  });
+}
+async function playProfileMusic(userId, music) {
+  try {
+
+    if (!userId || !music) {
+      throw new Error(
+        "音楽情報がありません"
+      );
+    }
+
+    stopProfileMusic();
+
+    showToast(
+      "🎵 音楽を読み込んでいます..."
+    );
+
+    const buffer =
+      await getProfileMusic(
+        userId,
+        music
+      );
+
+    const blob =
+      new Blob(
+        [buffer],
+        {
+          type:
+            music.mime ||
+            "audio/mpeg"
+        }
+      );
+
+    if (profileMusicObjectUrl) {
+      URL.revokeObjectURL(
+        profileMusicObjectUrl
+      );
+    }
+
+    profileMusicObjectUrl =
+      URL.createObjectURL(blob);
+
+    profileMusicAudio =
+      new Audio(
+        profileMusicObjectUrl
+      );
+
+    profileMusicAudio.preload =
+      "auto";
+
+    profileMusicAudio.onended =
+      () => {
+        updateProfileMusicPlayButtons(
+          false
+        );
+      };
+
+    await profileMusicAudio.play();
+
+    updateProfileMusicPlayButtons(
+      true
+    );
+
+    showToast(
+      `▶ ${music.name}`
+    );
+
+  } catch (error) {
+
+    console.error(
+      "プロフィール音楽再生エラー:",
+      error
+    );
+
+    updateProfileMusicPlayButtons(
+      false
+    );
+
+    showToast(
+      "音楽を再生できませんでした"
+    );
+  }
+}
+function stopProfileMusic() {
+  if (profileMusicAudio) {
+    try {
+      profileMusicAudio.pause();
+      profileMusicAudio.currentTime = 0;
+    } catch (error) {
+      console.error(error);
+    }
+
+    profileMusicAudio = null;
+  }
+
+  if (profileMusicObjectUrl) {
+    URL.revokeObjectURL(
+      profileMusicObjectUrl
+    );
+
+    profileMusicObjectUrl = null;
+  }
+
+  updateProfileMusicPlayButtons(
+    false
+  );
+}
+function updateProfileMusicPlayButtons(isPlaying) {
+  document
+    .querySelectorAll(
+      ".profileMusicPlayButton"
+    )
+    .forEach(button => {
+
+      button.textContent =
+        isPlaying
+          ? "⏸ 再生中"
+          : "▶ 再生";
+
+    });
+}
+async function deleteProfileMusic() {
+  if (!currentUser) {
+    showToast("ログインしてください");
+    return;
+  }
+
+  const music =
+    currentUser.profile_music;
+
+  if (!music || !music.music_id) {
+    showToast(
+      "プロフィール音楽がありません"
+    );
+    return;
+  }
+
+  const confirmed =
+    confirm(
+      `「${music.name}」を削除しますか？`
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    stopProfileMusic();
+
+    showToast(
+      "音楽を削除しています..."
+    );
+
+    // MQTT Retain削除
+    await clearProfileMusicRetain(
+      currentUser.id,
+      music
+    );
+
+    // Supabaseメタ情報削除
+    const { error } =
+      await supabaseClient
+        .from("users")
+        .update({
+          profile_music: null
+        })
+        .eq("id", currentUser.id);
+
+    if (error) {
+      throw error;
+    }
+
+    currentUser.profile_music =
+      null;
+
+    showToast(
+      "音楽を削除しました"
+    );
+
+    closeModal();
+
+    await showMyProfile();
+
+  } catch (error) {
+
+    console.error(
+      "プロフィール音楽削除エラー:",
+      error
+    );
+
+    showToast(
+      "音楽の削除に失敗しました"
+    );
+  }
+}
+async function handleProfileMusicSelect(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+
+    await uploadProfileMusic(file);
+
+    showToast(
+      "🎵 プロフィール音楽を設定しました"
+    );
+
+    await showMyProfile();
+
+  } catch (error) {
+
+    console.error(
+      "音楽アップロードエラー:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "音楽のアップロードに失敗しました"
+    );
+  }
+}
+function openProfileMusicFilePicker() {
+  const input =
+    document.getElementById(
+      "profileMusicFileInput"
+    );
+
+  if (!input) {
+    return;
+  }
+
+  input.value = "";
+
+  input.click();
+}
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+function setupProfileMusicDropZone() {
+  const drop =
+    document.getElementById(
+      "profileMusicDrop"
+    );
+
+  if (!drop) {
+    return;
+  }
+
+  drop.addEventListener(
+    "dragover",
+    event => {
+      event.preventDefault();
+
+      drop.classList.add(
+        "dragover"
+      );
+    }
+  );
+
+  drop.addEventListener(
+    "dragleave",
+    () => {
+      drop.classList.remove(
+        "dragover"
+      );
+    }
+  );
+
+  drop.addEventListener(
+    "drop",
+    async event => {
+
+      event.preventDefault();
+
+      drop.classList.remove(
+        "dragover"
+      );
+
+      const file =
+        event.dataTransfer.files[0];
+
+      if (!file) {
+        return;
+      }
+
+      await handleProfileMusicSelect(
+        file
+      );
+    }
+  );
+}
+function showToast(message) {
+  const toast =
+    document.getElementById("toast");
+
+  if (!toast) {
+    alert(message);
+    return;
+  }
+
+  toast.textContent =
+    message;
+
+  toast.classList.remove(
+    "hidden"
+  );
+
+  clearTimeout(
+    window.__toastTimer
+  );
+
+  window.__toastTimer =
+    setTimeout(() => {
+      toast.classList.add(
+        "hidden"
+      );
+    }, 3000);
 }
 
 restoreLogin();
