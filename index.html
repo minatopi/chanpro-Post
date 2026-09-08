@@ -1,4 +1,5 @@
 
+
 <!doctype html>
 <html lang=ja>
 
@@ -3468,7 +3469,7 @@ async function loadNotifications() {
   e.innerHTML = '<div class="empty">読み込み中...</div>';
   const { data: t, error: n } = await supabaseClient
     .from("notifications")
-    .select("id, user_id, actor_id, type, post_id, message_id, created_at")
+    .select("id, user_id, actor_id, type, post_id, message_id, created_at,message")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: !1 })
     .limit(50);
@@ -3493,40 +3494,74 @@ async function loadNotifications() {
     a = new Map((e || []).map((e) => [e.id, e]));
   }
   e.innerHTML = "";
-  for (const n of t) {
-    const t = r.get(n.actor_id);
-    if ("message" === n.type) {
-      const s = a.get(n.message_id),
-        r = document.createElement("div");
-      ((r.className = "notification"),
-        (r.innerHTML = `\n        <div style="cursor:pointer" onclick="openDMFromNotification('${t?.id || ""}')">\n          <b>${escapeHTML(t?.username || "ユーザー")}</b><span> からDMが届きました</span>\n          ${s ? `<div style="margin-top:6px;padding:10px;background:#f5f8fa;border-radius:10px;">${escapeHTML(s.content)}</div>` : ""}\n          <div class="handle">${formatDate(n.created_at)}</div>\n        </div>\n      `),
-        e.appendChild(r));
-      continue;
-    }
-    let s = "通知";
-    
-    ("like" === n.type && (s = "あなたの投稿にいいねしました"),
-      "reply" === n.type && (s = "あなたの投稿に返信しました"),
-      "repost" === n.type && (s = "あなたの投稿をリポストしました"),
-      "follow" === n.type && (s = "あなたをフォローしました"),
-      "post" === n.type && (s = "新しい投稿をしました"),
-      n.type && n.type.startsWith("program_like|") && (() => {
-        const parts = n.type.split("|");
-    
-        const count = parseInt(parts[2], 10);
-    
-        if (!isNaN(count)) {
-          s = `あなたのプロジェクトにいいねが ${count}件増えました`;
-        } else {
-          s = "あなたのプロジェクトにいいねが増えました";
-        }
-      })());
-    const i = document.createElement("div");
-    i.className = "notification";
-    const o = ("reply" === n.type || "post" === n.type) && n.post_id;
-    ((i.innerHTML = `\n      <div ${o ? `style="cursor:pointer" onclick="showPostDetail('${n.post_id}')"` : ""}>\n        <b>${escapeHTML(t?.username || "ユーザー")}</b> ${escapeHTML(s)}\n        <div class="handle">${formatDate(n.created_at)}</div>\n      </div>\n    `),
-      e.appendChild(i));
+for (const n of t) {
+  const t = r.get(n.actor_id);
+
+  if ("message" === n.type) {
+    const s = a.get(n.message_id),
+      r = document.createElement("div");
+
+    (
+      r.className = "notification",
+      r.innerHTML = `
+        <div style="cursor:pointer" onclick="openDMFromNotification('${t?.id || ""}')">
+          <b>${escapeHTML(t?.username || "ユーザー")}</b><span> からDMが届きました</span>
+          ${s ? `<div style="margin-top:6px;padding:10px;background:#f5f8fa;border-radius:10px;">${escapeHTML(s.content)}</div>` : ""}
+          <div class="handle">${formatDate(n.created_at)}</div>
+        </div>
+      `,
+      e.appendChild(r)
+    );
+
+    continue;
   }
+
+  let s = "通知";
+
+  "like" === n.type && (s = "あなたの投稿にいいねしました");
+  "reply" === n.type && (s = "あなたの投稿に返信しました");
+  "repost" === n.type && (s = "あなたの投稿をリポストしました");
+  "follow" === n.type && (s = "あなたをフォローしました");
+  "post" === n.type && (s = "新しい投稿をしました");
+
+  // プロジェクトへのいいね
+  "like-project" === n.type && (() => {
+    s = n.message || "あなたのプロジェクトにいいねがされました";
+  })();
+
+  n.type && n.type.startsWith("program_like|") && (() => {
+    const parts = n.type.split("|");
+    const count = parseInt(parts[2], 10);
+
+    if (!isNaN(count)) {
+      s = `あなたのプロジェクトにいいねが ${count}件増えました`;
+    } else {
+      s = "あなたのプロジェクトにいいねが増えました";
+    }
+  })();
+
+  const i = document.createElement("div");
+  i.className = "notification";
+
+  const o = ("reply" === n.type || "post" === n.type) && n.post_id;
+
+  // like-project は actor 名を表示しない
+  const notificationContent =
+    "like-project" === n.type
+      ? escapeHTML(s)
+      : `<b>${escapeHTML(t?.username || "ユーザー")}</b> ${escapeHTML(s)}`;
+
+  (
+    i.innerHTML = `
+      <div ${o ? `style="cursor:pointer" onclick="showPostDetail('${n.post_id}')"` : ""}>
+        ${notificationContent}
+        <div class="handle">${formatDate(n.created_at)}</div>
+      </div>
+    `,
+    e.appendChild(i)
+  );
+}
+
 }
 function mqttTopicUser(e) {
   return `chanpro-post/user/${e}`;
