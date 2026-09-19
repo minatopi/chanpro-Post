@@ -13,7 +13,7 @@
         <script src=https://unpkg.com/mqtt/dist/mqtt.min.js>
 
         </script>
-        <style>
+<style>
             * {
                 box-sizing: border-box
             }
@@ -1198,6 +1198,7 @@
                 margin-top: 8px
             }
         </style>
+
     </head>
 
     <body>
@@ -1423,15 +1424,58 @@
                 }), 2500)
             }
 
-            function openModal(e) {
-                const t = $("modal");
-                $("modalContent").innerHTML = e, t.open || t.showModal()
-            }
+function openModal(html){
+  const modal = $("modal");
+  const content = $("modalContent");
 
-            function closeModal() {
-                const e = $("modal");
-                e.open && e.close()
-            }
+  if(!modal || !content)return;
+
+  content.innerHTML = html;
+
+  if(!modal.open){
+    modal.showModal();
+  }
+}
+
+function closeModal(){
+  const modal = $("modal");
+
+  if(modal?.open){
+    modal.close();
+  }
+}
+
+/* ============================================================
+   ダイアログ外側クリックで閉じる
+   ============================================================ */
+
+document.addEventListener("click",function(event){
+  const modal = $("modal");
+
+  if(!modal || !modal.open)return;
+
+  /*
+   * クリックされた場所が modalBox の外側なら閉じる
+   */
+  const box = $("modalContent");
+
+  if(box && !box.contains(event.target)){
+    closeModal();
+  }
+});
+
+/*
+ * Escキーでも閉じる
+ */
+document.addEventListener("keydown",function(event){
+  const modal = $("modal");
+
+  if(!modal || !modal.open)return;
+
+  if(event.key === "Escape"){
+    closeModal();
+  }
+});
 
             function safeGet(e) {
                 try {
