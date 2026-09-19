@@ -2550,11 +2550,6 @@
                   console.log("MQTT: 再接続中...");
                 });
             
-                mqttClient.on("close",()=>{
-                  console.log("MQTT: 接続終了");
-                  window.__mqttConnected=false;
-                });
-            
                 mqttClient.on("offline",()=>{
                   console.log("MQTT: オフライン");
                   window.__mqttConnected=false;
