@@ -1555,8 +1555,69 @@
                     console.error("restoreLogin error:", e), safeRemove("chanpro_post_user")
                 }
             }
-            async function afterLogin() {
-                $("loginPage").classList.add("hidden"), $("app").classList.remove("hidden"), connectMQTT(), subscribeDMRealtime(), await Promise.all([loadHome(), loadTrends(), loadSuggestedUsers(), updateNotificationDot()]), checkAdmin(), $("quickLimitedToggle").classList.toggle("hidden", !currentUser?.verified)
+            async function afterLogin(){
+            
+              $("loginPage").classList.add("hidden");
+              $("app").classList.remove("hidden");
+            
+              console.log("ログイン完了");
+            
+              // MQTT接続が完了するまで待つ
+              try{
+            
+                await connectMQTT();
+            
+                console.log(
+                  "MQTT接続完了 → 画像読み込み開始可能"
+                );
+            
+              }catch(err){
+            
+                console.error(
+                  "MQTT接続待機エラー:",
+                  err
+                );
+            
+                toast("MQTTに接続できませんでした");
+            
+                return;
+              }
+            
+              // MQTT接続完了後にユーザー用トピックを購読
+              if(mqttClient?.connected && currentUser?.id){
+            
+                mqttClient.subscribe(
+                  mqttTopicUser(currentUser.id),
+                  {qos:0},
+                  err=>{
+                    if(err){
+                      console.error(
+                        "MQTT subscribe user:",
+                        err
+                      );
+                    }
+                  }
+                );
+            
+              }
+            
+              // DMリアルタイム
+              subscribeDMRealtime();
+            
+              // MQTT接続完了後にホームを読み込む
+              await Promise.all([
+                loadHome(),
+                loadTrends(),
+                loadSuggestedUsers(),
+                updateNotificationDot()
+              ]);
+            
+              checkAdmin();
+            
+              $("quickLimitedToggle").classList.toggle(
+                "hidden",
+                !currentUser?.verified
+              );
             }
 
             function logout() {
@@ -2505,66 +2566,154 @@
             }
 
             
+            let mqttReadyPromise = null;
+            let mqttReadyResolve = null;
+            let mqttReadyReject = null;
+            
             function connectMQTT(){
-              if(mqttClient){
-                try{
-                  if(mqttClient.connected){
-                    console.log("MQTT: すでに接続済み");
-                    return;
-                  }
             
-                  mqttClient.end(true);
-                }catch(err){
-                  console.warn("既存MQTT接続終了:",err);
-                }
-            
-                mqttClient=null;
+              // すでに接続済み
+              if(mqttClient?.connected){
+                return Promise.resolve();
               }
             
-              console.log("MQTT: サイト起動直後に接続開始");
+              // 接続処理中なら、そのPromiseをそのまま返す
+              if(mqttReadyPromise){
+                return mqttReadyPromise;
+              }
+            
+              mqttReadyPromise = new Promise((resolve,reject)=>{
+                mqttReadyResolve = resolve;
+                mqttReadyReject = reject;
+              });
+            
+              console.log("MQTT接続開始");
             
               try{
-                const clientId=
-                  "chanpro_" +
-                  Date.now().toString(36) +
-                  "_" +
-                  Math.random().toString(36).slice(2,10);
             
-                mqttClient=mqtt.connect(
-                  "wss://broker.hivemq.com:8884/mqtt",
+                const clientId =
+                  `chanpro-post-${Date.now()}-${Math.random()
+                    .toString(16)
+                    .slice(2)}`;
+            
+                mqttClient = mqtt.connect(
+                  MQTT_BROKER,
                   {
                     clientId,
                     clean:true,
-                    connectTimeout:10000,
                     reconnectPeriod:3000,
-                    keepalive:30
+                    connectTimeout:10000
                   }
                 );
             
                 mqttClient.on("connect",()=>{
-                  console.log("MQTT: 接続成功");
-                  window.__mqttConnected=true;
+            
+                  console.log("MQTT接続成功");
+            
+                  // グローバル購読
+                  mqttClient.subscribe(
+                    mqttTopicGlobal(),
+                    {qos:0},
+                    err=>{
+                      if(err){
+                        console.error("MQTT subscribe global:",err);
+                      }
+                    }
+                  );
+            
+                  // ログイン済みならユーザー用も購読
+                  if(currentUser?.id){
+            
+                    mqttClient.subscribe(
+                      mqttTopicUser(currentUser.id),
+                      {qos:0},
+                      err=>{
+                        if(err){
+                          console.error("MQTT subscribe user:",err);
+                        }
+                      }
+                    );
+            
+                  }
+            
+                  // MQTT接続完了
+                  if(mqttReadyResolve){
+            
+                    mqttReadyResolve();
+            
+                    mqttReadyResolve=null;
+                    mqttReadyReject=null;
+                  }
+            
                 });
             
                 mqttClient.on("reconnect",()=>{
-                  console.log("MQTT: 再接続中...");
+                  console.log("MQTT再接続中...");
+                });
+            
+                mqttClient.on("error",err=>{
+                  console.error("MQTT error:",err);
+            
+                  // 初回接続失敗だけPromiseを拒否
+                  if(mqttReadyReject){
+            
+                    mqttReadyReject(err);
+            
+                    mqttReadyResolve=null;
+                    mqttReadyReject=null;
+            
+                    mqttReadyPromise=null;
+                  }
                 });
             
                 mqttClient.on("offline",()=>{
-                  console.log("MQTT: オフライン");
-                  window.__mqttConnected=false;
+                  console.log("MQTT offline");
                 });
             
-                mqttClient.on("error",(err)=>{
-                  console.error("MQTTエラー:",err);
-                  window.__mqttConnected=false;
+                mqttClient.on("close",()=>{
+                  console.log("MQTT接続終了");
+                });
+            
+                mqttClient.on("message",async(topic,payload)=>{
+            
+                  try{
+            
+                    const data=JSON.parse(payload.toString());
+            
+                    await handleMQTTEvent(data);
+            
+                  }catch(err){
+            
+                    console.error(
+                      "MQTT message error:",
+                      err
+                    );
+            
+                  }
+            
                 });
             
               }catch(err){
-                console.error("MQTT接続開始失敗:",err);
+            
+                console.error(
+                  "MQTT接続開始失敗:",
+                  err
+                );
+            
+                mqttReadyPromise=null;
+            
+                if(mqttReadyReject){
+                  mqttReadyReject(err);
+                }
+            
+                mqttReadyResolve=null;
+                mqttReadyReject=null;
+            
                 mqttClient=null;
-                window.__mqttConnected=false;
+            
               }
+            
+              return mqttReadyPromise;
             }
 
 
