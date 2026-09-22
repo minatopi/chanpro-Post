@@ -4497,7 +4497,7 @@ if ("scratch" === t) {
    */
   try {
     const apiUrl =
-      `https://api.scratch.mit.edu/projects/${encodeURIComponent(r)}`;
+      `https://trampoline.turbowarp.org/api/projects/${encodeURIComponent(r)}`;
 
     console.log(
       "Scratch API request:",
@@ -5256,78 +5256,365 @@ function hideProfileMusicUploadProgress() {
         n && (n.textContent = "");
     }, 700);
 }
-async function getProfileMusic(e, t) {
-  if (!e || !t || !t.music_id) throw new Error("音楽情報がありません");
-  const n = t.music_id,
-    i = Number(t.chunks);
-  if (!Number.isInteger(i) || i <= 0)
+async function getProfileMusic(e,t){
+
+  if(!e||!t||!t.music_id){
+    throw new Error("音楽情報がありません");
+  }
+
+  const n=t.music_id;
+  const i=Number(t.chunks);
+
+  if(!Number.isInteger(i)||i<=0){
     throw new Error("音楽チャンク情報が不正です");
-  if (i > PROFILE_MUSIC_MAX_CHUNKS)
+  }
+
+  if(i>PROFILE_MUSIC_MAX_CHUNKS){
     throw new Error("音楽チャンク数が上限を超えています");
-  const o = new Array(i),
-    r = [];
-  for (let t = 0; t < i; t++)
-    r.push({ index: t, topic: getProfileMusicTopic(e, n, "chunk", t) });
-  return new Promise((e, t) => {
-    const s = setTimeout(() => {
-        l(), t(new Error("音楽データの取得がタイムアウトしました"));
-      }, 3e4),
-      a = [];
-    function l() {
-      clearTimeout(s);
-      for (const e of a) mqttClient.removeListener("message", e);
-      for (const e of r) mqttClient.unsubscribe(e.topic, () => {});
+  }
+
+  const o=new Array(i);
+  const r=[];
+
+  for(let t=0;t<i;t++){
+    r.push({
+      index:t,
+      topic:getProfileMusicTopic(
+        e,
+        n,
+        "chunk",
+        t
+      )
+    });
+  }
+
+  return new Promise((resolve,reject)=>{
+
+    const timeout=setTimeout(()=>{
+      cleanup();
+      reject(
+        new Error(
+          "音楽データの取得がタイムアウトしました"
+        )
+      );
+    },30000);
+
+    const listeners=[];
+
+    function cleanup(){
+
+      clearTimeout(timeout);
+
+      for(const e of listeners){
+        mqttClient.removeListener(
+          "message",
+          e
+        );
+      }
+
+      for(const e of r){
+        mqttClient.unsubscribe(
+          e.topic,
+          ()=>{}
+        );
+      }
     }
-    let c = 0;
-    for (const e of r)
-      mqttClient.subscribe(e.topic, { qos: 1 }, (e) => {
-        e && (l(), t(e));
-      });
-    const d = (s, a) => {
-      const d = r.find((e) => e.topic === s);
-      if (d)
-        try {
-          const t = JSON.parse(a.toString());
-          if ("profile_music_chunk" !== t.type) return;
-          if (t.music_id !== n) return;
-          if (t.index !== d.index) return;
-          if (o[d.index]) return;
-          if (((o[d.index] = t.data), c++, c >= i)) {
-            l();
-            const t = o.map((e) => base64ToArrayBuffer(e)),
-              n = t.reduce((e, t) => e + t.byteLength, 0),
-              i = new Uint8Array(n);
-            let r = 0;
-            for (const e of t) i.set(new Uint8Array(e), r), (r += e.byteLength);
-            e(i.buffer);
+
+    let c=0;
+
+    /*
+     * 全チャンクを購読
+     */
+    for(const e of r){
+
+      mqttClient.subscribe(
+        e.topic,
+        {qos:1},
+        e=>{
+          if(e){
+            cleanup();
+            reject(e);
           }
-        } catch (e) {
-          l(), t(e);
         }
+      );
+    }
+
+    /*
+     * MQTT受信
+     */
+    const messageHandler=(s,a)=>{
+
+      const d=r.find(
+        e=>e.topic===s
+      );
+
+      if(!d)return;
+
+      try{
+
+        const t=JSON.parse(
+          a.toString()
+        );
+
+        if(
+          t.type!=="profile_music_chunk"
+        ){
+          return;
+        }
+
+        if(t.music_id!==n){
+          return;
+        }
+
+        if(t.index!==d.index){
+          return;
+        }
+
+        /*
+         * 同じチャンクを二重カウントしない
+         */
+        if(o[d.index]){
+          return;
+        }
+
+        o[d.index]=t.data;
+        c++;
+
+        /*
+         * 読み込み進捗
+         */
+        const progress=Math.round(
+          (c/i)*100
+        );
+
+        const bar=
+          document.getElementById(
+            "profileMusicLoadProgressBar"
+          );
+
+        const text=
+          document.getElementById(
+            "profileMusicLoadProgressText"
+          );
+
+        if(bar){
+          bar.style.width=
+            `${progress}%`;
+        }
+
+        if(text){
+          text.textContent=
+            `${progress}%`;
+        }
+
+        /*
+         * 全チャンク取得完了
+         */
+        if(c>=i){
+
+          cleanup();
+
+          /*
+           * Base64 → ArrayBuffer
+           */
+          const buffers=o.map(
+            e=>base64ToArrayBuffer(e)
+          );
+
+          /*
+           * 全体サイズ
+           */
+          const totalSize=
+            buffers.reduce(
+              (e,t)=>e+t.byteLength,
+              0
+            );
+
+          /*
+           * 1つのUint8Arrayに結合
+           */
+          const result=
+            new Uint8Array(
+              totalSize
+            );
+
+          let offset=0;
+
+          for(const buffer of buffers){
+
+            result.set(
+              new Uint8Array(buffer),
+              offset
+            );
+
+            offset+=buffer.byteLength;
+          }
+
+          /*
+           * 100%を確実に表示
+           */
+          if(bar){
+            bar.style.width="100%";
+          }
+
+          if(text){
+            text.textContent="100%";
+          }
+
+          resolve(
+            result.buffer
+          );
+        }
+
+      }catch(e){
+
+        cleanup();
+        reject(e);
+      }
     };
-    a.push(d), mqttClient.on("message", d);
+
+    listeners.push(
+      messageHandler
+    );
+
+    mqttClient.on(
+      "message",
+      messageHandler
+    );
   });
 }
-async function playProfileMusic(e, t) {
-  try {
-    if (!e || !t) throw new Error("音楽情報がありません");
-    stopProfileMusic(), showToast("🎵 音楽を読み込んでいます...");
-    const n = await getProfileMusic(e, t),
-      i = new Blob([n], { type: t.mime || "audio/mpeg" });
-    profileMusicObjectUrl && URL.revokeObjectURL(profileMusicObjectUrl),
-      (profileMusicObjectUrl = URL.createObjectURL(i)),
-      (profileMusicAudio = new Audio(profileMusicObjectUrl)),
-      (profileMusicAudio.preload = "auto"),
-      (profileMusicAudio.onended = () => {
-        updateProfileMusicPlayButtons(!1);
-      }),
-      await profileMusicAudio.play(),
-      updateProfileMusicPlayButtons(!0),
-      showToast(`▶ ${t.name}`);
-  } catch (e) {
-    console.error("プロフィール音楽再生エラー:", e),
-      updateProfileMusicPlayButtons(!1),
-      showToast("音楽を再生できませんでした");
+async function playProfileMusic(e,t){
+
+  try{
+
+    if(!e||!t){
+      throw new Error(
+        "音楽情報がありません"
+      );
+    }
+
+    /*
+     * 現在再生中の音楽を停止
+     */
+    stopProfileMusic();
+
+    /*
+     * 読み込み開始
+     *
+     * showToast() が
+     * メッセージ＋スライダーを表示する
+     */
+    showToast(
+      "🎵 音楽を読み込んでいます..."
+    );
+
+    /*
+     * MQTTから全チャンク取得
+     */
+    const n=
+      await getProfileMusic(
+        e,
+        t
+      );
+
+    /*
+     * 念のため100%表示
+     */
+    const bar=
+      document.getElementById(
+        "profileMusicLoadProgressBar"
+      );
+
+    const text=
+      document.getElementById(
+        "profileMusicLoadProgressText"
+      );
+
+    if(bar){
+      bar.style.width="100%";
+    }
+
+    if(text){
+      text.textContent="100%";
+    }
+
+    /*
+     * Blob作成
+     */
+    const i=new Blob(
+      [n],
+      {
+        type:
+          t.mime||
+          "audio/mpeg"
+      }
+    );
+
+    /*
+     * 古いObjectURLを破棄
+     */
+    if(profileMusicObjectUrl){
+
+      URL.revokeObjectURL(
+        profileMusicObjectUrl
+      );
+
+      profileMusicObjectUrl=null;
+    }
+
+    /*
+     * 新しい音声を作成
+     */
+    profileMusicObjectUrl=
+      URL.createObjectURL(i);
+
+    profileMusicAudio=
+      new Audio(
+        profileMusicObjectUrl
+      );
+
+    profileMusicAudio.preload=
+      "auto";
+
+    /*
+     * 再生終了
+     */
+    profileMusicAudio.onended=()=>{
+      updateProfileMusicPlayButtons(
+        false
+      );
+    };
+
+    /*
+     * 再生
+     */
+    await profileMusicAudio.play();
+
+    updateProfileMusicPlayButtons(
+      true
+    );
+
+    /*
+     * 読み込み完了後は通常Toastへ戻す
+     */
+    showToast(
+      `▶ ${t.name}`
+    );
+
+  }catch(e){
+
+    console.error(
+      "プロフィール音楽再生エラー:",
+      e
+    );
+
+    updateProfileMusicPlayButtons(
+      false
+    );
+
+    showToast(
+      "音楽を再生できませんでした"
+    );
   }
 }
 function stopProfileMusic() {
@@ -5411,26 +5698,79 @@ function setupProfileMusicDropZone() {
       n && (await handleProfileMusicSelect(n));
     }));
 }
-function showToast(e) {
-  const t = document.getElementById("toast");
-  t
-    ? ((t.textContent = e),
-      t.classList.remove("hidden"),
-      clearTimeout(window.__toastTimer),
-      (window.__toastTimer = setTimeout(() => {
-        t.classList.add("hidden");
-      }, 3e3)))
-    : console.log(e);
+function showToast(e){
+  const t=document.getElementById("toast");
+
+  if(!t){
+    console.log(e);
+    return;
+  }
+
+  /*
+   * プロフィール音楽の読み込み中だけ
+   * メッセージ＋進捗スライダーを表示
+   */
+  if(String(e).includes("🎵 音楽を読み込んでいます")){
+
+    t.innerHTML=`
+      <div style="width:100%;">
+        <div>
+          🎵 音楽を読み込んでいます...
+        </div>
+
+        <div style="
+          margin-top:8px;
+          width:100%;
+          height:5px;
+          background:#e5e7eb;
+          border-radius:999px;
+          overflow:hidden;
+        ">
+          <div
+            id="profileMusicLoadProgressBar"
+            style="
+              width:0%;
+              height:100%;
+              background:#1d9bf0;
+              border-radius:999px;
+              transition:width .15s ease;
+            "
+          ></div>
+        </div>
+
+        <div
+          id="profileMusicLoadProgressText"
+          style="
+            margin-top:4px;
+            font-size:11px;
+            text-align:center;
+            opacity:.8;
+          "
+        >
+          0%
+        </div>
+      </div>
+    `;
+
+    t.classList.remove("hidden");
+
+    clearTimeout(window.__toastTimer);
+
+    return;
+  }
+
+  /*
+   * 通常のToast
+   */
+  t.textContent=e;
+  t.classList.remove("hidden");
+
+  clearTimeout(window.__toastTimer);
+
+  window.__toastTimer=setTimeout(()=>{
+    t.classList.add("hidden");
+  },3000);
 }
-setTimeout(() => {
-  const quickText = $("quickPostText");
-  if (quickText) quickText.value = quickText.value.trimStart();
-  quickText?.addEventListener("input", () =>
-    updateComposerLinkPreview("quick")
-  );
-}, 0),
-  restoreLogin(),
-  connectMQTT();
 
 function adminBadge(user, size = 18) {
   return user?.role === "admin" ? `
