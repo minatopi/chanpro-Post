@@ -1,5 +1,6 @@
 
 
+
 <!doctype html>
 <html lang=ja>
 <head>
@@ -189,8 +190,7 @@
 <div id=homePage>
 <div class=pageHeader>ホーム</div>
 <div class=composer>
-<textarea id=quickPostText placeholder=いまどうしてる？>
-          </textarea>
+<textarea id=quickPostText placeholder=いまどうしてる？></textarea>
 <input id=quickPostImage placeholder=画像URL（任意）>
 <div class=postImageUploadRow>
 <button type=button class=postImageUploadButton onclick='openPostImagePicker("quick")'>＋</button>
@@ -365,10 +365,184 @@ function escapeHTML(e) {
     .replace(/'/g, "&#039;");
 }
 function verifiedBadge(e, t = 18) {
-  return e?.verified
-    ? `\n    <span\n      class="verifiedBadge"\n      title="認証済み"\n      aria-label="認証済み"\n      style="\n        display:inline-flex;\n        align-items:center;\n        justify-content:center;\n        width:${t}px;\n        height:${t}px;\n        vertical-align:-3px;\n        margin-left:3px;\n      "\n    >\n      <svg\n        viewBox="0 0 22 22"\n        width="${t}"\n        height="${t}"\n        aria-hidden="true"\n      >\n        <path\n          fill="#1d9bf0"\n          d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816z"\n        />\n        <path\n          fill="#fff"\n          d="M9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"\n        />\n      </svg>\n    </span>\n  `
-    : "";
+
+  if (!e?.verified) {
+    return "";
+  }
+
+  /*
+   * ポイントランキングからユーザーを検索
+   */
+  const index = Array.isArray(pointsRanking)
+    ? pointsRanking.findIndex(
+        x => String(x?.id) === String(e.id)
+      )
+    : -1;
+
+  /*
+   * rank がJSONにあればそれを使用。
+   * なければ配列の位置から順位を計算。
+   */
+  const rankingUser =
+    index >= 0
+      ? pointsRanking[index]
+      : null;
+
+  const rank =
+    rankingUser
+      ? (
+          Number(rankingUser.rank) ||
+          (index + 1)
+        )
+      : null;
+
+
+  /*
+   * 共通スタイル
+   */
+  const badgeStyle = `
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:${t}px;
+    height:${t}px;
+    min-width:${t}px;
+    min-height:${t}px;
+    vertical-align:-3px;
+    margin-left:3px;
+    line-height:0;
+    flex-shrink:0;
+  `;
+
+
+  /*
+   * =========================================================
+   * 1位
+   *
+   * 金色は <linearGradient> を使わず、
+   * SVGの直接fillにする。
+   *
+   * これにより id 重複や url(#...) の参照問題を防止。
+   * =========================================================
+   */
+  if (rank === 1) {
+
+    return `
+      <span
+        class="verifiedBadge verifiedBadgeGold"
+        title="認証済み・ポイントランキング1位"
+        aria-label="認証済み・ポイントランキング1位"
+        style="${badgeStyle}"
+      >
+        <svg
+          viewBox="0 0 22 22"
+          width="${t}"
+          height="${t}"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          focusable="false"
+        >
+
+          <!-- 外側の金色バッジ -->
+          <path
+            fill="#FFD700"
+            d="M13.101 4.533L11 2.5 8.899 4.533l-2.895-.41-.505 2.88-2.583 1.37L4.2 11l-1.284 2.627 2.583 1.37.505 2.88 2.895-.41L11 19.5l2.101-2.033 2.895.41.505-2.88 2.583-1.37L17.8 11l1.284-2.627-2.583-1.37-.505-2.88z"
+          />
+
+          <!-- チェック -->
+          <path
+            fill="#FFFFFF"
+            d="M6.233 11.423l3.429 3.428 5.683-6.206-1.347-1.247-4.4 4.795-2.072-2.072z"
+          />
+
+        </svg>
+      </span>
+    `;
+  }
+
+
+/*
+ * =========================================================
+ * 2位・3位
+ *
+ * 銀色バッジ
+ * =========================================================
+ */
+if (rank === 2 || rank === 3) {
+
+  return `
+    <span
+      class="verifiedBadge verifiedBadgeSilver"
+      title="認証済み・ポイントランキング${rank}位"
+      aria-label="認証済み・ポイントランキング${rank}位"
+      style="${badgeStyle}"
+    >
+      <svg
+        viewBox="0 0 22 22"
+        width="${t}"
+        height="${t}"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        focusable="false"
+      >
+
+        <!-- 銀色の認証バッジ -->
+        <path
+          fill="#829aab"
+          d="M12.05 2.056c-.568-.608-1.532-.608-2.1 0l-1.393 1.49c-.284.303-.685.47-1.1.455L5.42 3.932c-.832-.028-1.514.654-1.486 1.486l.069 2.039c.014.415-.152.816-.456 1.1l-1.49 1.392c-.608.568-.608 1.533 0 2.101l1.49 1.393c.304.284.47.684.456 1.1l-.07 2.038c-.027.832.655 1.514 1.487 1.486l2.038-.069c.415-.014.816.152 1.1.455l1.392 1.49c.569.609 1.533.609 2.102 0l1.393-1.49c.283-.303.684-.47 1.099-.455l2.038.069c.832.028 1.515-.654 1.486-1.486L18 14.542c-.015-.415.152-.815.455-1.099l1.49-1.393c.608-.568.608-1.533 0-2.101l-1.49-1.393c-.303-.283-.47-.684-.455-1.1l.068-2.038c.029-.832-.654-1.514-1.486-1.486l-2.038.07c-.415.013-.816-.153-1.1-.456z"
+        />
+
+        <!-- 白いチェックマーク -->
+        <path
+          fill="#FFFFFF"
+          d="M6.233 11.423l3.429 3.428 5.683-6.206-1.347-1.247-4.4 4.795-2.072-2.072z"
+        />
+
+      </svg>
+    </span>
+  `;
 }
+
+
+
+  /*
+   * =========================================================
+   * 通常の認証マーク
+   *
+   * 4位以下・ランキング外
+   * =========================================================
+   */
+  return `
+    <span
+      class="verifiedBadge"
+      title="認証済み"
+      aria-label="認証済み"
+      style="${badgeStyle}"
+    >
+      <svg
+        viewBox="0 0 22 22"
+        width="${t}"
+        height="${t}"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        focusable="false"
+      >
+
+        <path
+          fill="#1d9bf0"
+          d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816z"
+        />
+
+        <path
+          fill="#fff"
+          d="M9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"
+        />
+
+      </svg>
+    </span>
+  `;
+}
+
 function avatarURL(e, t = 100) {
   return e || `https://placehold.jp/${t}x${t}.png`;
 }
@@ -611,32 +785,82 @@ async function restoreLogin() {
     }
 }
 async function afterLogin() {
-  $("loginPage").classList.add("hidden"),
-    $("app").classList.remove("hidden"),
-    console.log("ログイン完了");
-  try {
-    await connectMQTT(), console.log("MQTT接続完了 → 画像読み込み開始可能");
-  } catch (e) {
-    return (
-      console.error("MQTT接続待機エラー:", e),
-      void toast("MQTTに接続できませんでした")
-    );
-  }
-  mqttClient?.connected &&
-    currentUser?.id &&
-    mqttClient.subscribe(mqttTopicUser(currentUser.id), { qos: 0 }, (e) => {
-      e && console.error("MQTT subscribe user:", e);
-    }),
-    subscribeDMRealtime(),
-    await Promise.all([
-      loadHome(),
-      loadTrends(),
-      loadSuggestedUsers(),
-      updateNotificationDot(),
-    ]),
-    checkAdmin(),
-    $("quickLimitedToggle").classList.toggle("hidden", !currentUser?.verified);
+  $("loginPage").classList.add("hidden");
+  $("app").classList.remove("hidden");
+
+  console.log("ログイン完了");
+
+  // MQTT接続とSupabase読み込みを並行して開始
+  const mqttPromise = (async () => {
+    try {
+      // MQTT接続は待つ
+      await Promise.race([
+        connectMQTT(),
+
+        // MQTTがいつまでも接続できない場合に処理を止めない
+        new Promise((_, reject) =>
+          setTimeout(() => {
+            reject(new Error("MQTT接続タイムアウト"));
+          }, 5000)
+        )
+      ]);
+
+      console.log("MQTT接続完了");
+
+      // ログイン済みならユーザーチャンネルを購読
+      if (mqttClient?.connected && currentUser?.id) {
+        await new Promise((resolve) => {
+          mqttClient.subscribe(
+            mqttTopicUser(currentUser.id),
+            { qos: 0 },
+            (e) => {
+              if (e) {
+                console.error("MQTT subscribe user:", e);
+              } else {
+                console.log("MQTTユーザーチャンネル購読完了");
+              }
+
+              // subscribe失敗でも処理を止めない
+              resolve();
+            }
+          );
+        });
+      }
+    } catch (e) {
+      // MQTT失敗・タイムアウトしてもログイン処理は継続
+      console.error("MQTT接続失敗:", e);
+    }
+  })();
+
+  /*
+   * MQTTを待たずにSupabase処理を開始
+   */
+  subscribeDMRealtime();
+
+  await Promise.all([
+    loadPointsRanking(),
+    loadHome(),
+    loadTrends(),
+    loadSuggestedUsers(),
+    updateNotificationDot()
+  ]);
+
+  /*
+   * MQTTの結果を待つ。
+   *
+   * ただしmqttPromiseは内部でエラーをcatchしているので、
+   * MQTT失敗によってafterLogin()自体が止まることはない。
+   */
+  await mqttPromise;
+
+  checkAdmin();
+
+  $("quickLimitedToggle").classList.toggle(
+    "hidden",
+    !currentUser?.verified
+  );
 }
+
 function logout() {
   (currentUser = null),
     cache.users.clear(),
@@ -755,9 +979,10 @@ function openPostModal(e = null, t = !1) {
     t || (modalPendingPoll = null),
     (modalPendingQuotePostId = e || null),
     (modalPostImageFile = null),
-    openModal(
-      '\n    <h2>投稿</h2>\n    <textarea id="modalPostText" placeholder="いまどうしてる？" style="width:100%;height:130px"></textarea>\n    <input id="modalPostImage" placeholder="画像URL（任意）">\n    <div class="postImageUploadRow">\n      <button type="button" class="postImageUploadButton" onclick="openPostImagePicker(\'modal\')">＋</button>\n      <input id="modalPostImageFile" class="postImageFileInput" type="file" accept="image/jpeg,image/png,image/webp" onchange="handlePostImageFile(\'modal\',this.files[0])">\n      <span id="modalPostImageStatus" class="handle"></span>\n    </div>\n    <div id="modalPostImagePreview" class="postImagePreview hidden"></div>\n    <div id="modalLinkPreview" class="composerLinkPreviews"></div>\n    <button type="button" class="toolButton" style="margin-top:8px" onclick="openPollComposer(\'modal\')">📊 アンケート</button>\n    <div id="modalPollPreview"></div>\n    <div id="modalQuotePreview"></div>\n    <button id="modalLimitedToggle" class="secondary hidden" style="width:100%;margin-top:8px" onclick="toggleModalLimited()">🔒 限定投稿</button>\n    <div style="text-align:right;margin-top:10px">\n      <button class="secondary" onclick="closeModal()">キャンセル</button>\n      <button class="primary" onclick="submitPost()">投稿</button>\n    </div>\n  '
-    ),
+openModal(
+  '<h2>投稿</h2><textarea id="modalPostText" placeholder="いまどうしてる？" style="width:100%;height:130px"></textarea><input id="modalPostImage" placeholder="画像URL（任意）"><div class="postImageUploadRow"><button type="button" class="postImageUploadButton" onclick="openPostImagePicker(\'modal\')">＋</button><input id="modalPostImageFile" class="postImageFileInput" type="file" accept="image/jpeg,image/png,image/webp" onchange="handlePostImageFile(\'modal\',this.files[0])"><span id="modalPostImageStatus" class="handle"></span></div><div id="modalPostImagePreview" class="postImagePreview hidden"></div><div id="modalLinkPreview" class="composerLinkPreviews"></div><button type="button" class="toolButton" style="margin-top:8px" onclick="openPollComposer(\'modal\')">📊 アンケート</button><div id="modalPollPreview"></div><div id="modalQuotePreview"></div><button id="modalLimitedToggle" class="secondary hidden" style="width:100%;margin-top:8px" onclick="toggleModalLimited()">🔒 限定投稿</button><div style="text-align:right;margin-top:10px"><button class="secondary" onclick="closeModal()">キャンセル</button><button class="primary" onclick="submitPost()">投稿</button></div>'
+),
+
     $("modalLimitedToggle").classList.toggle("hidden", !currentUser?.verified),
     $("modalPostText")?.addEventListener("input", () =>
       updateComposerLinkPreview("modal")
@@ -2086,7 +2311,6 @@ async function showMyProfile() {
 async function showUserProfile(e){
 
   window.__lastProfileUserId=e;
-
   if(!e){
     return toast("ユーザーIDがありません");
   }
@@ -4495,6 +4719,7 @@ if ("scratch" === t) {
    * 1. Scratch APIを試す
    * -----------------------------------------
    */
+
   try {
     const apiUrl =
       `https://trampoline.turbowarp.org/api/projects/${encodeURIComponent(r)}`;
@@ -4531,14 +4756,21 @@ if ("scratch" === t) {
         ? data.title.trim()
         : "Scratch プロジェクト";
 
-    const description =
-      typeof data.instructions === "string" &&
-      data.instructions.trim()
-        ? data.instructions.trim()
-        : typeof data.notesAndCredits === "string" &&
-          data.notesAndCredits.trim()
-          ? data.notesAndCredits.trim()
-          : "Scratch プロジェクト";
+const descriptionlong =
+  typeof data.instructions === "string" &&
+  data.instructions.trim()
+    ? data.instructions.trim()
+    : typeof data.notesAndCredits === "string" &&
+      data.notesAndCredits.trim()
+      ? data.notesAndCredits.trim()
+      : "Scratch プロジェクト";
+
+const description =
+  descriptionlong.length > 50
+    ? descriptionlong.substring(0, 50) + "..."
+    : descriptionlong;
+
+
 
     return {
       ...n,
@@ -5803,11 +6035,8 @@ function adminBadge(user, size = 18) {
   ` : "";
 }
 
-function userBadges(verifiedBadgeuser, size = 18) {
-  return `${verifiedBadge(user, size)}${adminBadge(user, size)}`;
-}
-function userBadges(e, n = 18) {
-  return `${verifiedBadge(e, n)}${adminBadge(e, n)}`;
+function userBadges(e,t=18){
+    return `${verifiedBadge(e,t)}${adminBadge(e,t)}`
 }
 function renderComposerUrlPreview(text, target) {
   const el = typeof target === "string" ? $(target) : target;
@@ -6131,6 +6360,80 @@ async function closePostDetail(){
   }
 
 }
+let pointsRanking = [];
+async function loadPointsRanking() {
+    try {
+        const response = await fetch(
+            "https://minatopi.github.io/Points-Ranking/ranking.json",
+            {
+                cache: "no-store"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("ranking.json の取得に失敗しました");
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+            pointsRanking = data;
+        } else {
+            pointsRanking = [];
+        }
+
+        console.log("ポイントランキング読み込み完了:", pointsRanking);
+
+    } catch (error) {
+        console.error("ポイントランキング取得エラー:", error);
+        pointsRanking = [];
+    }
+}
+/*
+ * ============================================================
+ * MQTTはログイン前から接続開始
+ * ============================================================
+ */
+(function startMQTTBeforeLogin(){
+
+  console.log("ログイン前MQTT接続開始");
+
+  connectMQTT()
+    .then(()=>{
+      console.log("ログイン前MQTT接続成功");
+
+      /*
+       * 接続開始時点で既にログイン済みだった場合
+       * ユーザーチャンネルも購読
+       */
+      if(mqttClient?.connected && currentUser?.id){
+
+        mqttClient.subscribe(
+          mqttTopicUser(currentUser.id),
+          {qos:0},
+          (e)=>{
+            if(e){
+              console.error("MQTT subscribe user:",e);
+            }
+          }
+        );
+
+      }
+
+    })
+    .catch((e)=>{
+      /*
+       * MQTTに接続できなくても何もしない。
+       *
+       * Supabaseからの投稿読み込みには影響させない。
+       */
+      console.warn(
+        "MQTTに接続できませんでした。投稿表示は継続します。",
+        e
+      );
+    });
+
+})();
 </script>
 </body>
 </html>
