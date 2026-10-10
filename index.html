@@ -4502,7 +4502,7 @@ async function showUserProfile(e) {
                 const n = await t.json();
                 if (!Array.isArray(n) || !n.length) return void (e.innerHTML = '<div class="empty">ニュースはありません</div>');
                 e.innerHTML = "";
-                for (const i of n.slice(0, 8)) {
+                for (const i of n) {
                     const t = document.createElement("a");
                     t.className = "newsItem", t.href = i.url || "#", t.target = "_blank", t.rel = "noopener noreferrer";
                     const o = document.createElement("div");
