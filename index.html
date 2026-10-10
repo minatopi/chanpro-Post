@@ -4538,7 +4538,7 @@ async function showUserProfile(e) {
                 for (const item of items) {
                     const row = document.createElement("div");
                     row.className = "trend";
-                    row.innerHTML = `<b>#${escapeHTML(item.tag)}</b><small>${item.count}回</small>`;
+                    row.innerHTML = `<b>#${escapeHTML(item.tag)}</b><small>${item.count}投稿</small>`;
                     row.onclick = () => searchHashtag(item.tag);
                     el.appendChild(row);
                 }
