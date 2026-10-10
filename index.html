@@ -2388,12 +2388,21 @@
             return String(value || "").trim().replace(/^#+/, "").replace(/\s+/g, "").replace(/[＃#]/g, "");
         }
 
-        function appendTrendHashtags(content, tags) {
-            const existing = new Set((String(content || "").match(/#[\p{L}\p{N}_]+/gu) || [])
-                .map(x => normalizeTrendTag(x.slice(1)).toLowerCase()));
-            const add = tags.filter(tag => !existing.has(tag.toLowerCase())).map(tag => "#" + tag);
-            return [String(content || "").trim(), add.join("\n")].filter(Boolean).join("\n\n").trim();
-        }
+ function appendTrendHashtags(content, tags) {
+    const existing = new Set(
+        (String(content || "").match(/#[\p{L}\p{N}_]+/gu) || [])
+            .map(x => normalizeTrendTag(x.slice(1)).toLowerCase())
+    );
+
+    const add = tags
+        .filter(tag => !existing.has(tag.toLowerCase()))
+        .map(tag => "#" + tag);
+
+    return [
+        String(content || "").trim(),
+        add.join(" ")
+    ].filter(Boolean).join("\n\n").trim();
+}
 
         function getTrendState(scope) {
             return scope === "quick" ? quickTrendTags : modalTrendTags;
@@ -2489,7 +2498,7 @@
             }
         }
 
-   async function suggestTrendTags(scope) {
+async function suggestTrendTags(scope) {
     commitTrendInput(scope);
 
     const contentEl = $(scope === "quick" ? "quickPostText" : "modalPostText");
@@ -2623,6 +2632,7 @@
         }
     }
 }
+
         async function addPostPoints() {
             if (!currentUser?.id) return;
             const {
