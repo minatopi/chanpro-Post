@@ -3616,11 +3616,18 @@ async function showUserProfile(e) {
     $("profilePage").innerHTML = '<div class="empty">読み込み中...</div>';
 
     try {
-        const t = await getUser(e);
+        // プロフィールはキャッシュだけでなくSupabaseから最新データを取得する。
+        // ログイン直後のcache.usersにはprogram_views/program_likesが含まれない場合がある。
+        const t = await getUser(e, true);
 
         if (!t)
             return void ($("profilePage").innerHTML =
                 '<div class="empty">ユーザーが見つかりません</div>');
+
+        if (currentUser && e === currentUser.id) {
+            Object.assign(currentUser, t);
+            cache.users.set(currentUser.id, currentUser);
+        }
 
         window.__profileMusicMap = window.__profileMusicMap || {};
 
@@ -3708,7 +3715,7 @@ async function showUserProfile(e) {
         d.length && (g = `
     <div class="programStats" style="margin-top:15px;">
 
-      ${m || f ? `
+      ${true ? `
         <h3 style="margin-bottom:10px; display:flex; align-items:center; gap:12px;">
           ちゃんプロで公開した作品の総閲覧、いいね数
           <a
@@ -3730,7 +3737,7 @@ async function showUserProfile(e) {
           "
         >
 
-          ${m ? `
+          ${true ? `
             <div style="text-align:center;">
               <div style="font-size:28px;font-weight:700;">
                 👀 ${u.toLocaleString("ja-JP")}
@@ -3741,7 +3748,7 @@ async function showUserProfile(e) {
             </div>
           ` : ""}
 
-          ${f ? `
+          ${true ? `
             <div style="text-align:center;">
               <div style="font-size:28px;font-weight:700;">
                 ❤️ ${p.toLocaleString("ja-JP")}
