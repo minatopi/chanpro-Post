@@ -1714,6 +1714,14 @@
         .profileUploadRow button{width:100%}
 
 </style>
+    <script>
+        !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],Object.defineProperty(u,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e}}),Object.defineProperty(u.people,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(){return u.toString(1)+".people (stub)"}}),o="gu mu yu bu ku init Qu Zu Wu Vu Yu el Gu ec zu lc uc cc hc dc vc capture getExtension Ju fu mc calculateEventProperties gc register register_once register_for_session unregister unregister_for_session wc Uu yc getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys onActiveMatchingSurveysChanged renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync kc identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset Sc shutdown set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty bc rc createPersonProfile Cu xu opt_in_capturing opt_out_capturing $u has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing nc debug il Os getPageViewId captureTraceFeedback captureTraceMetric Nu".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+        posthog.init('phc_tf9gNd4jCXp9rf5SRDo9pwSz2cyHjXfZwRm8xjda6uFV', {
+            api_host: 'https://us.i.posthog.com',
+            defaults: '2026-05-30',
+            person_profiles: 'identified_only',
+        });
+    </script>
 </head>
 
 <body>
@@ -2081,7 +2089,7 @@
                 if (r) return console.error("ログインエラー:", r), void ($("loginError").textContent = "ログインに失敗しました");
                 if (!o) return void ($("loginError").textContent = "ユーザー名またはパスワードが違います");
                 if (o.ban_until && new Date(o.ban_until) > new Date) return void ($("loginError").textContent = "このアカウントはBANされています");
-                currentUser = o, currentPasswordHash = i, cache.users.set(o.id, o), safeSet("chanpro_post_user", o.id), await saveUserDevice(o.id), await saveLoginIP(o.id), $("loginError").textContent = "", await afterLogin()
+                currentUser = o, currentPasswordHash = i, cache.users.set(o.id, o), safeSet("chanpro_post_user", o.id), await saveUserDevice(o.id), $("loginError").textContent = "", await afterLogin()
             } catch (e) {
                 console.error("login unexpected error:", e), $("loginError").textContent = "ログイン処理に失敗しました"
             } else $("loginError").textContent = "入力してください"
@@ -3719,7 +3727,7 @@ async function showUserProfile(e) {
         <h3 style="margin-bottom:10px; display:flex; align-items:center; gap:12px;">
           ちゃんプロで公開した作品の総閲覧、いいね数
           <a
-            href="https://minatopi.github.io/chanpro/Scraping.html"
+            href="https://minatopi.github.io/chanpro/Scrng.html"
             target="_blank"
             rel="noopener noreferrer"
             style="font-size:12px; padding:3px 8px; border-radius:4px;"
@@ -6398,25 +6406,7 @@ async function showUserProfile(e) {
                 post_id: t
             })
         }
-        async function saveLoginIP(e) {
-            try {
-                if (!e) return void console.warn("saveLoginIP: userId がありません");
-                const t = await fetch("https://.ipinfo.io/lite/me?token=5112a9b935a52d");
-                if (!t.ok) throw new Error(`IPinfo  Error: HTTP ${t.status}`);
-                const n = (await t.json())?.ip;
-                if (!n) throw new Error("IPアドレスを取得できませんでした");
-                console.log("ログインIP:", n);
-                const {
-                    error: i
-                } = await supabaseClient.from("users").update({
-                    last_login_ip: n
-                }).eq("id", e);
-                if (i) return void console.error("last_login_ip 保存エラー:", i);
-                console.log("last_login_ip 保存完了:", n)
-            } catch (e) {
-                console.error("ログインIP取得エラー:", e)
-            }
-        }
+
         console.log("ログイン前MQTT接続開始"), connectMQTT().then((() => {
             console.log("ログイン前MQTT接続成功"), mqttClient?.connected && currentUser?.id && mqttClient.subscribe(mqttTopicUser(currentUser.id), {
                 qos: 0
