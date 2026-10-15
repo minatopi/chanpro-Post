@@ -1346,6 +1346,19 @@
             border-radius:14px;background:#000
         }
         .postAudioPlayer { width:100%; margin-top:10px; display:block; }
+        .postAudioPreview { margin:10px 0;padding:12px;border:1px solid #cfd9de;border-radius:12px;background:#f7f9fa; }
+        .postAudioPreviewHead { display:flex;align-items:flex-start;gap:10px; }
+        .postAudioPreviewIcon { font-size:24px;line-height:1.3; }
+        .postAudioPreviewInfo { min-width:0;flex:1; }
+        .postAudioFileName { font-weight:700;overflow-wrap:anywhere; }
+        .postAudioFileSize,.postAudioStatus { color:#536471;font-size:12px;margin-top:4px; }
+        .postAudioPreview audio { width:100%;margin-top:8px; }
+        .postAudioRemove { border:0;border-radius:8px;padding:6px 10px;background:#fee2e2;color:#991b1b;cursor:pointer; }
+        .postAudioStatus.error { color:#b91c1c; }
+        .postAudioStatus.success { color:#166534; }
+        .postAudioLoadStatus { font-size:12px;color:#536471;margin-top:6px;overflow-wrap:anywhere; }
+        .postAudioRetry { display:none;margin-top:6px;padding:5px 9px;border:1px solid #cfd9de;background:#fff;border-radius:8px;cursor:pointer; }
+        .postAudioRetry.show { display:inline-block; }
         .mqttPostImage {
             display: block;
             width: 100%;
@@ -1801,8 +1814,8 @@
                         <span id=quickPostImageStatus class=handle>
                         </span>
                     </div>
-                    <div id=quickPostImagePreview class="postImagePreview hidden">
-                    </div>
+                    <div id=quickPostImagePreview class="postImagePreview hidden"></div>
+                    <div id="quickPostAudioPreview" class="postAudioPreview hidden"></div>
                     <div id=quickLinkPreview class=composerLinkPreviews>
                     </div>
                     <button id=quickLimitedToggle class="secondary hidden" style=margin-top:8px;width:100%
@@ -1909,6 +1922,8 @@
         const TREND_AI_MODEL = "gpt-6-luna";
         let quickTrendTags = [];
         let quickPostAudioFile = null, modalPostAudioFile = null;
+        let quickProgramHtml = "", modalProgramHtml = "";
+        const postAudioObjectUrls = {quick:null, modal:null};
         const profileMusicBlobCache = new Map();
         const programPostCodeMap = new Map();
         let programComposerReturnText = "";
@@ -2135,7 +2150,19 @@
                 console.error("restoreLogin error:", e), safeRemove("chanpro_post_user")
             }
         }
+        function identifyPostHogUser() {
+            if (!window.posthog || typeof posthog.identify !== "function" || !currentUser?.id) return;
+            const userId = String(currentUser.id);
+            const username = String(currentUser.username || "");
+            // PostHogの人物IDをChanProのユーザーIDに統一し、ユーザー名も人物プロパティとして保存
+            posthog.identify(userId, {
+                user_id: userId,
+                username: username
+            });
+        }
+
         async function afterLogin() {
+            identifyPostHogUser();
             $("loginPage").classList.add("hidden"), $("app").classList.remove("hidden"), console.log("ログイン完了");
             setupTrendInput("quick");
             const e = (async () => {
@@ -2157,6 +2184,7 @@
         }
 
         function logout() {
+            if (window.posthog && typeof posthog.reset === "function") posthog.reset();
             clearLineLinkPoll(), currentUser = null, currentPasswordHash = "", cache.users.clear(), cache.posts.clear(), cache.follows = null, cache.trends = null, cache.suggestedUsers = null, safeRemove("chanpro_post_user"), location.reload()
         }
 
@@ -2258,11 +2286,13 @@
 
             if (!t) {
                 modalPendingPoll = null;
+                modalProgramHtml = "";
             }
 
             modalPendingQuotePostId = e || null;
             modalPostImageFile = null;
             modalPostAudioFile = null;
+            clearPostAudioPreview("modal");
             modalTrendTags = [];
 
             openModal(`
@@ -2290,7 +2320,7 @@
         <div class="postImageUploadRow">
             <button type="button" class="postImageUploadButton" onclick='$("modalPostMediaFile").click()'>＋</button>
             <input id="modalPostMediaFile" class="postImageFileInput" type="file" accept="image/jpeg,image/png,image/webp,audio/*,.wav,.mp3,.ogg,.m4a,.flac,.aac,.opus,.webm" onchange='handleComposerMediaFile("modal",this.files[0])'>
-            <input id="modalPostAudioFile" class="postImageFileInput" type="file" accept="audio/*" onchange="modalPostAudioFile=this.files[0]||null">
+            <input id="modalPostAudioFile" class="postImageFileInput" type="file" accept="audio/*" onchange="handleComposerMediaFile('modal',this.files[0])">
 
             <input
                 id="modalPostImageFile"
@@ -2306,10 +2336,8 @@
             ></span>
         </div>
 
-        <div
-            id="modalPostImagePreview"
-            class="postImagePreview hidden"
-        ></div>
+        <div id="modalPostImagePreview" class="postImagePreview hidden"></div>
+        <div id="modalPostAudioPreview" class="postAudioPreview hidden"></div>
 
         <div
             id="modalLinkPreview"
@@ -2387,35 +2415,33 @@
         async function quickPost() {
             setupTrendInput("quick");
             commitTrendInput("quick");
-            const e = $("quickPostText").value.trim(),
-                t = $("quickPostImage").value.trim(),
-                trends = [...quickTrendTags];
-            await createPost(e, t, quickLimited, null, quickPendingPoll, quickPostImageFile, trends, quickPostAudioFile), $("quickPostText").value = "", $("quickPostImage").value = "", quickPostImageFile = null, quickPostAudioFile = null, $("quickPostMediaFile").value = "", clearPostImagePreview("quick"), quickPendingPoll = null, renderPollPreview("quickPollPreview", null), $("quickLinkPreview").innerHTML = "", quickLimited = !1;
-            quickTrendTags = [];
-            renderTrendChips("quick");
+            const e = $("quickPostText").value.trim(), t = $("quickPostImage").value.trim(), trends = [...quickTrendTags];
+            const succeeded = await createPost(e, t, quickLimited, null, quickPendingPoll, quickPostImageFile, trends, quickPostAudioFile, quickProgramHtml);
+            if (!succeeded) return; // 失敗時は音声・画像・本文を残して再試行できる
+            $("quickPostText").value = ""; $("quickPostImage").value = "";
+            quickPostImageFile = null; quickPostAudioFile = null; quickProgramHtml = "";
+            $("quickPostMediaFile").value = ""; clearPostImagePreview("quick"); clearPostAudioPreview("quick");
+            quickPendingPoll = null; renderPollPreview("quickPollPreview", null); $("quickLinkPreview").innerHTML = ""; quickLimited = !1;
+            quickTrendTags = []; renderTrendChips("quick");
             const n = $("quickLimitedToggle");
-            n && (n.classList.remove("primary"), n.classList.add("secondary"), n.textContent = "一般公開")
+            n && (n.classList.remove("primary"), n.classList.add("secondary"), n.textContent = "一般公開");
         }
         async function submitPost() {
             commitTrendInput("modal");
-            const e = $("modalPostText").value.trim(),
-                t = $("modalPostImage").value.trim(),
-                trends = [...modalTrendTags];
-            await createPost(e, t, modalLimited, modalPendingQuotePostId, modalPendingPoll, modalPostImageFile, trends, modalPostAudioFile);
-            modalPostAudioFile = null;
-            closeModal();
-            modalPostImageFile = null;
-            modalPendingPoll = null;
-            modalPendingQuotePostId = null;
-            modalTrendTags = [];
+            const e = $("modalPostText").value.trim(), t = $("modalPostImage").value.trim(), trends = [...modalTrendTags];
+            const succeeded = await createPost(e, t, modalLimited, modalPendingQuotePostId, modalPendingPoll, modalPostImageFile, trends, modalPostAudioFile, modalProgramHtml);
+            if (!succeeded) return; // 失敗時は閉じず、選択した音声を保持
+            modalPostAudioFile = null; modalPostImageFile = null; modalProgramHtml = ""; clearPostAudioPreview("modal");
+            closeModal(); modalPendingPoll = null; modalPendingQuotePostId = null; modalTrendTags = [];
         }
         function normalizeTrendTag(value) {
             return String(value || "").trim().replace(/^#+/, "").replace(/\s+/g, "").replace(/[＃#]/g, "");
         }
 
  function appendTrendHashtags(content, tags) {
+    const plainText = String(content || "").replace(/```html\s*\n[\s\S]*?\n```/gi, "");
     const existing = new Set(
-        (String(content || "").match(/#[\p{L}\p{N}_]+/gu) || [])
+        (plainText.match(/#[\p{L}\p{N}_]+/gu) || [])
             .map(x => normalizeTrendTag(x.slice(1)).toLowerCase())
     );
 
@@ -2700,6 +2726,12 @@
             const match = String(content || "").match(/```html\s*\n([\s\S]*?)\n```/i);
             return match ? match[1] : null;
         }
+        function programHtmlWithCurrentUser(html) {
+            const user = { username: currentUser?.username ?? null, id: currentUser?.id ?? null };
+            const userJson = JSON.stringify(user).replace(/</g, "\\u003c");
+            const bridge = `<script>window.chanpro=Object.freeze({getCurrentUser:async()=>${userJson}});<\/script>`;
+            return bridge + String(html || "");
+        }
         function renderPostContent(content, postId) {
             const html = extractProgramHtml(content);
             if (html === null) return formatContent(content, true);
@@ -2717,69 +2749,108 @@
             openModal(`<h2>💻 HTMLプログラムを追加</h2><p class="handle">最大${MAX_PROGRAM_HTML_LENGTH.toLocaleString()}文字。HTMLは安全のため隔離されたプレビューで表示します。</p><label>HTMLコード</label><textarea id="programHtmlInput" maxlength="${MAX_PROGRAM_HTML_LENGTH}" rows="12" style="width:100%;font-family:monospace" placeholder="<!doctype html>\n<html>...</html>"></textarea><div id="programHtmlCount" class="handle">0 / ${MAX_PROGRAM_HTML_LENGTH}</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="secondary" onclick="closeModal()">キャンセル</button><button class="secondary" onclick="previewProgramDraft()">プレビュー</button><button class="primary" onclick="insertProgramDraft('${where}')">投稿に追加</button></div><div id="programDraftPreview"></div>`);
             const input = document.getElementById("programHtmlInput");
             input.addEventListener("input", () => { document.getElementById("programHtmlCount").textContent = input.value.length + " / " + MAX_PROGRAM_HTML_LENGTH; });
-            if (existing.includes("```html")) input.value = extractProgramHtml(existing) || "";
+            const pendingHtml = where === "quick" ? quickProgramHtml : modalProgramHtml;
+            if (pendingHtml) input.value = pendingHtml;
+            else if (existing.includes("```html")) input.value = extractProgramHtml(existing) || "";
+            document.getElementById("programHtmlCount").textContent = input.value.length + " / " + MAX_PROGRAM_HTML_LENGTH;
         }
         function previewProgramDraft() {
             const html = document.getElementById("programHtmlInput")?.value || "";
             const mount = document.getElementById("programDraftPreview");
             if (!mount) return;
             mount.innerHTML = '<h3>プレビュー</h3><iframe sandbox="allow-scripts" style="width:100%;height:280px;border:1px solid #ddd;border-radius:10px"></iframe>';
-            mount.querySelector("iframe").srcdoc = html;
+            mount.querySelector("iframe").srcdoc = programHtmlWithCurrentUser(html);
         }
         function insertProgramDraft(where) {
             const html = document.getElementById("programHtmlInput")?.value || "";
             if (!html.trim()) return toast("HTMLコードを入力してください");
             if (html.length > MAX_PROGRAM_HTML_LENGTH) return toast("HTMLは最大" + MAX_PROGRAM_HTML_LENGTH + "文字です");
-            const base = programComposerReturnText.replace(/```html\s*\n[\s\S]*?\n```/i, "").trim();
-            const combined = (base ? base + "\n\n" : "") + "```html\n" + html + "\n```";
-            closeModal();
-            if (where === "modal") {
-                openPostModal(modalPendingQuotePostId, true);
+
+            // HTMLは本文欄へ即時挿入せず、投稿ボタンを押した時に一緒に保存する
+            if (where === "quick") {
+                quickProgramHtml = html;
+                closeModal();
+            } else {
+                modalProgramHtml = html;
+                const savedText = programComposerReturnText;
+                const savedImage = programComposerReturnImageFile;
+                const savedAudio = programComposerReturnAudioFile;
+                const savedTrends = [...programComposerReturnTrendTags];
+                const quoteId = modalPendingQuotePostId;
+                closeModal();
+                openPostModal(quoteId, true);
                 const target = document.getElementById("modalPostText");
-                if (target) target.value = combined;
-                modalPostImageFile = programComposerReturnImageFile;
-                modalPostAudioFile = programComposerReturnAudioFile;
-                modalTrendTags = [...programComposerReturnTrendTags];
+                if (target) target.value = savedText;
+                modalPostImageFile = savedImage;
+                modalPostAudioFile = savedAudio;
+                modalTrendTags = savedTrends;
                 renderTrendChips("modal");
                 if (modalPostImageFile) handlePostImageFile("modal", modalPostImageFile);
-            } else {
-                const target = document.getElementById("quickPostText");
-                if (target) target.value = combined;
+                if (modalPostAudioFile) renderPostAudioPreview("modal", modalPostAudioFile);
             }
-            toast("HTMLプログラムを投稿内容に追加しました。投稿ボタンで公開できます");
+            toast("HTMLプログラムを保存しました。投稿ボタンを押すと本文と一緒に投稿されます");
         }
         function openProgramPost(postId) {
             const html = programPostCodeMap.get(String(postId));
             if (html == null) return toast("プログラムコードを読み込めませんでした");
             openModal(`<h2>💻 HTMLプログラム</h2><label>コード（Markdownのコードブロックから復元）</label><textarea id="programPostCodeView" readonly rows="12" style="width:100%;font-family:monospace"></textarea><h3>プレビュー</h3><iframe id="programPostPreviewFrame" sandbox="allow-scripts" style="width:100%;height:320px;border:1px solid #ddd;border-radius:10px"></iframe><div style="text-align:right;margin-top:10px"><button class="primary" onclick="closeModal()">閉じる</button></div>`);
             document.getElementById("programPostCodeView").value = html;
-            document.getElementById("programPostPreviewFrame").srcdoc = html;
+            document.getElementById("programPostPreviewFrame").srcdoc = programHtmlWithCurrentUser(html);
         }
 
         function handleComposerMediaFile(where, file) {
             if (!file) return;
-            const audio = file.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|opus|webm)$/i.test(file.name);
+            const audio = file.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|opus|webm|oga|weba)$/i.test(file.name);
             const image = file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
             if (audio) {
-                if (file.size > 2 * 1024 * 1024) { toast("音声は2MB以下にしてください"); return; }
+                if (file.size > 2 * 1024 * 1024) { toast("音声は2MB以下にしてください（最大2MB）"); return; }
                 if (where === "quick") quickPostAudioFile = file; else modalPostAudioFile = file;
-                toast("音声を選択しました: " + file.name);
+                removePostImage(where); // 投稿メディアは画像か音声のどちらか1つに統一
+                renderPostAudioPreview(where, file);
+                toast("音声を選択しました。投稿前に試聴できます");
             } else if (image) {
+                if (where === "quick") quickPostAudioFile = null; else modalPostAudioFile = null;
+                clearPostAudioPreview(where);
                 handlePostImageFile(where, file);
-            } else toast("画像または音声ファイルを選択してください");
+            } else toast("対応している画像または音声ファイルを選択してください");
+        }
+        function renderPostAudioPreview(where, file) {
+            const box = $(where === "quick" ? "quickPostAudioPreview" : "modalPostAudioPreview");
+            if (!box || !file) return;
+            if (postAudioObjectUrls[where]) URL.revokeObjectURL(postAudioObjectUrls[where]);
+            const url = URL.createObjectURL(file); postAudioObjectUrls[where] = url;
+            box.innerHTML = `<div class="postAudioPreviewHead"><div class="postAudioPreviewIcon">🎵</div><div class="postAudioPreviewInfo"><div class="postAudioFileName"></div><div class="postAudioFileSize"></div></div><button type="button" class="postAudioRemove" onclick="removePostAudio('${where}')">音声を削除</button></div><audio controls preload="metadata"></audio><div class="postAudioStatus">投稿前の試聴です。投稿時にPNG化してImgBBへアップロードします。</div>`;
+            box.querySelector(".postAudioFileName").textContent = file.name || "音声ファイル";
+            box.querySelector(".postAudioFileSize").textContent = formatPostImageSize(file.size) + " ・ " + (file.type || "形式不明");
+            box.querySelector("audio").src = url;
+            box.classList.remove("hidden");
+        }
+        function clearPostAudioPreview(where) {
+            const box = $(where === "quick" ? "quickPostAudioPreview" : "modalPostAudioPreview");
+            if (postAudioObjectUrls[where]) { URL.revokeObjectURL(postAudioObjectUrls[where]); postAudioObjectUrls[where] = null; }
+            if (box) { box.innerHTML = ""; box.classList.add("hidden"); }
+        }
+        function removePostAudio(where) {
+            if (where === "quick") { quickPostAudioFile = null; const input = $("quickPostMediaFile"); if (input) input.value = ""; }
+            else { modalPostAudioFile = null; const input = $("modalPostMediaFile"); if (input) input.value = ""; }
+            clearPostAudioPreview(where);
+            toast("投稿する音声を削除しました");
         }
 
-        async function createPost(content, imageUrl, limited, quotePostId = null, poll = null, imageFile = null, trendTags = [], audioFile = null) {
+        async function createPost(content, imageUrl, limited, quotePostId = null, poll = null, imageFile = null, trendTags = [], audioFile = null, programHtml = "") {
             const normalizedTrends = [...new Set((trendTags || []).map(normalizeTrendTag).filter(Boolean))].slice(0, 3);
-            const contentWithTrends = appendTrendHashtags(content || "", normalizedTrends);
-            content = contentWithTrends;
-            if (!(content || imageUrl || imageFile || audioFile || quotePostId || poll)) return void toast("投稿内容を入力してください");
+            let postWasSaved = false;
+            const contentWithoutProgram = String(content || "").replace(/```html\s*\n[\s\S]*?\n```/gi, "").trim();
+            const contentWithTrends = appendTrendHashtags(contentWithoutProgram, normalizedTrends);
+            const cleanProgramHtml = String(programHtml || "").trim();
+            content = [contentWithTrends, cleanProgramHtml ? "```html\n" + cleanProgramHtml + "\n```" : ""].filter(Boolean).join("\n\n");
+            if (!(content || imageUrl || imageFile || audioFile || quotePostId || poll)) { toast("投稿内容を入力してください"); return false; }
             if (imageUrl) {
                 try {
                     const u = new URL(imageUrl);
                     if (!["http:", "https:"].includes(u.protocol)) return void toast("画像URLが正しくありません");
                 } catch {
-                    return void toast("画像URLが正しくありません");
+                    toast("画像URLが正しくありません"); return false;
                 }
             }
             const isLimited = !!(limited && currentUser?.verified);
@@ -2808,9 +2879,10 @@
                     .single();
                 if (error) {
                     console.error("投稿保存エラー:", error);
-                    return void toast("投稿に失敗しました: " + (error.message || ""));
+                    toast("投稿に失敗しました: " + (error.message || "音声や本文は保持されています")); return false;
                 }
                 cache.posts.set(post.id, post);
+                postWasSaved = true;
                 await extractHashtags(post.id, content || "");
                 await notifyFollowersAboutPost(post.id, isLimited);
                 mqttPublish(mqttTopicGlobal(), { type: "post_created", post_id: post.id, user_id: currentUser.id });
@@ -2819,15 +2891,23 @@
                 await loadHome();
                 cache.trends = null;
                 await loadTrends();
+                return true;
             } catch (err) {
                 console.error("createPost:", err);
-                toast(err?.message || "投稿に失敗しました");
+                if (postWasSaved) {
+                    toast("投稿は保存されました。一部の更新処理でエラーが発生しました。");
+                    try { await loadHome(); } catch (_) {}
+                    return true;
+                }
+                toast((err?.message || "投稿に失敗しました") + "。選択した音声は保持されています。もう一度投稿できます。");
+                return false;
             }
         }
 
         // 本文中の #タグを hashtags テーブルに登録し、usage_count を更新する
         async function extractHashtags(postId, text) {
-            const matches = String(text || "").match(/#[\p{L}\p{N}_]+/gu) || [];
+            const textWithoutProgram = String(text || "").replace(/```html\s*\n[\s\S]*?\n```/gi, "");
+            const matches = textWithoutProgram.match(/#[\p{L}\p{N}_]+/gu) || [];
             const tags = [...new Set(matches.map(x => x.slice(1).toLowerCase()))];
             for (const tag of tags) {
                 const { data: oldRow, error: readError } = await supabaseClient
@@ -2929,7 +3009,6 @@
                 el.className = "postAudioPlayer";
                 if (String(url).includes("#chanpro-audio-png")) {
                     el.dataset.audioPngUrl = String(url).split("#")[0];
-                    el.insertAdjacentText("beforebegin", "この投稿の音声はPNG形式で保存されています。再生には読み込み処理が必要です。");
                     el.className += " audioPngPlayer";
                 } else el.src = url;
                 return el;
@@ -2947,6 +3026,58 @@
         async function uploadAudioPng(file) {
             const png = await audioFileToPng(file);
             return await uploadBlobToImgbb(png, (file.name || "audio") + ".png");
+        }
+        function setupAudioPngPlayback(mount, mediaUrl) {
+            const audio = mount?.querySelector("audio");
+            if (!audio || audio.dataset.audioHandler === "1") return;
+            audio.dataset.audioHandler = "1";
+            const status = document.createElement("div"); status.className = "postAudioLoadStatus"; status.textContent = "音声データは未読み込みです。再生ボタンを押すと読み込みます。";
+            const retry = document.createElement("button"); retry.type = "button"; retry.className = "postAudioRetry"; retry.textContent = "音声を再読み込み";
+            mount.append(status, retry);
+            let loading = false;
+            const loadAndPlay = async () => {
+                if (audio.dataset.loaded === "1") { try { await audio.play(); } catch(e) { status.textContent = "再生できません。プレイヤーの再生ボタンをもう一度押してください。"; } return; }
+                if (loading) return;
+                loading = true; audio.pause(); audio.controls = false; retry.classList.remove("show"); status.className = "postAudioLoadStatus"; status.textContent = "音声PNGを取得・復元しています…";
+                try {
+                    const response = await fetch(mediaUrl.split("#")[0], {mode:"cors", cache:"no-store"});
+                    if (!response.ok) throw new Error("音声ファイルの取得に失敗しました（HTTP " + response.status + "）");
+                    const decoded = await unpackAudioPng(await response.blob());
+                    const objectUrl = URL.createObjectURL(new Blob([decoded.bytes], {type:decoded.type || "audio/mpeg"}));
+                    audio.src = objectUrl; audio.dataset.loaded = "1"; audio.controls = true; audio.preload = "metadata";
+                    status.className = "postAudioLoadStatus success"; status.textContent = "読み込み完了：" + decoded.name;
+                    try { await audio.play(); } catch (e) { status.textContent = "音声を復元しました。プレイヤーの再生ボタンを押してください。"; }
+                } catch (err) {
+                    console.error("投稿音声の読み込み失敗:", err);
+                    status.className = "postAudioLoadStatus error";
+                    status.textContent = "音声を読み込めませんでした：" + (err?.message || "不明なエラー") + "。ImgBBの取得制限やPNG変換の影響が考えられます。";
+                    retry.classList.add("show"); audio.controls = true;
+                } finally { loading = false; }
+            };
+            audio.addEventListener("play", e => { if (audio.dataset.loaded !== "1") { e.preventDefault?.(); loadAndPlay(); } });
+            retry.addEventListener("click", loadAndPlay);
+            audio.addEventListener("error", () => { if (audio.dataset.loaded === "1") { status.className = "postAudioLoadStatus error"; status.textContent = "復元後の音声を再生できません。音声形式がブラウザに対応していない可能性があります。"; retry.classList.add("show"); } });
+        }
+
+        function setupDirectAudioStatus(mount, mediaUrl) {
+            const audio = mount?.querySelector("audio");
+            if (!audio || audio.dataset.directAudioHandler === "1" || String(mediaUrl).includes("#chanpro-audio-png")) return;
+            audio.dataset.directAudioHandler = "1";
+            const status = document.createElement("div");
+            status.className = "postAudioLoadStatus";
+            status.textContent = "音声の読み込みを待っています…";
+            const retry = document.createElement("button");
+            retry.type = "button"; retry.className = "postAudioRetry"; retry.textContent = "音声を再読み込み";
+            mount.append(status, retry);
+            const loading = () => { status.className = "postAudioLoadStatus"; status.textContent = "音声を読み込んでいます…"; retry.classList.remove("show"); };
+            const success = () => { status.className = "postAudioLoadStatus success"; status.textContent = "音声を読み込みました。再生できます。"; retry.classList.remove("show"); };
+            const failure = () => { status.className = "postAudioLoadStatus error"; status.textContent = "音声を読み込めませんでした。URLや対応形式を確認してください。"; retry.classList.add("show"); };
+            audio.addEventListener("loadstart", loading);
+            audio.addEventListener("loadedmetadata", success);
+            audio.addEventListener("canplay", success);
+            audio.addEventListener("error", failure);
+            retry.addEventListener("click", () => { loading(); try { audio.pause(); audio.currentTime = 0; audio.src = mediaUrl; audio.load(); } catch (_) { failure(); } });
+            if (audio.readyState >= 1) success();
         }
 
         async function uploadPostImageToImgbb(file) {
@@ -3333,20 +3464,8 @@ ${e.is_pinned ? `
     i.querySelectorAll(".postMediaUrlMount").forEach(mount => {
         const mediaUrl = mount.dataset.mediaUrl || "";
         mount.appendChild(renderMediaUrl(mediaUrl));
-        if (mediaUrl.includes("#chanpro-audio-png")) {
-            const audio = mount.querySelector("audio");
-            audio.addEventListener("play", async () => {
-                if (audio.dataset.loaded === "1") return;
-                audio.pause();
-                try {
-                    const response = await fetch(mediaUrl.split("#")[0]);
-                    if (!response.ok) throw new Error("PNG取得失敗");
-                    const decoded = await unpackAudioPng(await response.blob());
-                    audio.src = URL.createObjectURL(new Blob([decoded.bytes], {type:decoded.type}));
-                    audio.dataset.loaded = "1"; await audio.play();
-                } catch (err) { toast("音声PNGを読み込めません。ImgBBのCORS制限の可能性があります"); }
-            }, {once:true});
-        }
+        if (mediaUrl.includes("#chanpro-audio-png")) setupAudioPngPlayback(mount, mediaUrl);
+        else if (mount.querySelector("audio")) setupDirectAudioStatus(mount, mediaUrl);
     });
 
     return (
@@ -3396,20 +3515,8 @@ ${e.is_pinned ? `
             if (mediaMount) {
                 const mediaUrl = mediaMount.dataset.mediaUrl || "";
                 mediaMount.appendChild(renderMediaUrl(mediaUrl));
-                if (mediaUrl.includes("#chanpro-audio-png")) {
-                    const audio = mediaMount.querySelector("audio");
-                    audio?.addEventListener("play", async () => {
-                        if (audio.dataset.loaded === "1") return;
-                        audio.pause();
-                        try {
-                            const response = await fetch(mediaUrl.split("#")[0]);
-                            if (!response.ok) throw new Error("PNG取得失敗");
-                            const decoded = await unpackAudioPng(await response.blob());
-                            audio.src = URL.createObjectURL(new Blob([decoded.bytes], {type:decoded.type}));
-                            audio.dataset.loaded = "1"; await audio.play();
-                        } catch (err) { toast("音声PNGを読み込めません。ImgBBのCORS制限の可能性があります"); }
-                    }, {once:true});
-                }
+                if (mediaUrl.includes("#chanpro-audio-png")) setupAudioPngPlayback(mediaMount, mediaUrl);
+                else if (mediaMount.querySelector("audio")) setupDirectAudioStatus(mediaMount, mediaUrl);
             }
             if (d) { d.dataset.postId = n.id; renderPostContent(d, n.content || "", n.id); }
             if (n.quote_post_id) await renderQuotePreviewById(n.quote_post_id, "detailQuoteMount");
@@ -5973,7 +6080,7 @@ async function showUserProfile(e) {
                 frame.className = "programPostPreview";
                 frame.title = "HTMLプレビュー";
                 frame.setAttribute("sandbox", "allow-scripts");
-                frame.srcdoc = html;
+                frame.srcdoc = programHtmlWithCurrentUser(html);
                 frame.addEventListener("click", event => event.stopPropagation());
                 const button = document.createElement("button");
                 button.type = "button";
